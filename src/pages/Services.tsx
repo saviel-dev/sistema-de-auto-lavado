@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +32,7 @@ const initialServices: Service[] = [
     name: "Lavado Express",
     description: "Lavado exterior rápido y eficiente",
     duration: "15 min",
-    price: "$50",
+    price: "5",
     popular: false,
   },
   {
@@ -40,7 +40,7 @@ const initialServices: Service[] = [
     name: "Lavado Completo",
     description: "Lavado exterior e interior profundo",
     duration: "45 min",
-    price: "$120",
+    price: "10",
     popular: true,
   },
   {
@@ -48,7 +48,7 @@ const initialServices: Service[] = [
     name: "Encerado Premium",
     description: "Encerado profesional con cera de alta calidad",
     duration: "60 min",
-    price: "$200",
+    price: "20",
     popular: true,
   },
   {
@@ -56,7 +56,7 @@ const initialServices: Service[] = [
     name: "Pulido de Faros",
     description: "Restauración y pulido de faros delanteros",
     duration: "30 min",
-    price: "$80",
+    price: "8",
     popular: false,
   },
   {
@@ -64,7 +64,7 @@ const initialServices: Service[] = [
     name: "Limpieza de Motor",
     description: "Limpieza profunda del compartimento del motor",
     duration: "40 min",
-    price: "$150",
+    price: "12",
     popular: false,
   },
   {
@@ -72,7 +72,7 @@ const initialServices: Service[] = [
     name: "Detallado Completo",
     description: "Servicio premium con todo incluido",
     duration: "3 hrs",
-    price: "$400",
+    price: "35",
     popular: true,
   },
 ];
@@ -81,6 +81,7 @@ const Services = () => {
   const [services, setServices] = useState<Service[]>(initialServices);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [dolarRate, setDolarRate] = useState<number | null>(null);
   const { toast } = useToast();
   
   // Form state
@@ -90,6 +91,27 @@ const Services = () => {
     duration: "",
     description: "",
   });
+
+  useEffect(() => {
+    const fetchDolarRate = async () => {
+      try {
+        const response = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+        if (!response.ok) throw new Error('Error al obtener la tasa');
+        const data = await response.json();
+        setDolarRate(data.promedio);
+      } catch (err) {
+        console.error('Error fetching dolar rate:', err);
+      }
+    };
+    fetchDolarRate();
+  }, []);
+
+  const calculateBsEquivalent = (usdPrice: string): string => {
+    if (!dolarRate || !usdPrice) return "Calculando...";
+    const price = parseFloat(usdPrice);
+    if (isNaN(price)) return "---";
+    return (price * dolarRate).toFixed(2);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
@@ -118,7 +140,7 @@ const Services = () => {
               name: formData.name,
               description: formData.description,
               duration: formData.duration,
-              price: formData.price.startsWith("$") ? formData.price : `$${formData.price}`,
+              price: formData.price,
             }
           : service
       ));
@@ -133,7 +155,7 @@ const Services = () => {
         name: formData.name,
         description: formData.description,
         duration: formData.duration,
-        price: formData.price.startsWith("$") ? formData.price : `$${formData.price}`,
+        price: formData.price,
         popular: false,
       };
       setServices([...services, newService]);
@@ -151,7 +173,7 @@ const Services = () => {
   const handleEditClick = (service: Service) => {
     setFormData({
       name: service.name,
-      price: service.price.replace('$', ''),
+      price: service.price,
       duration: service.duration,
       description: service.description,
     });
@@ -176,7 +198,7 @@ const Services = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Servicios</h1>
           <p className="text-muted-foreground">Gestiona los servicios ofrecidos</p>
@@ -185,7 +207,7 @@ const Services = () => {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button 
-              className="gap-2 bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+              className="gap-2 bg-gradient-to-r from-primary to-secondary hover:opacity-90 w-full md:w-auto"
               onClick={handleAddNewClick}
             >
               <IoAddOutline className="h-5 w-5" />
@@ -202,50 +224,58 @@ const Services = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 p-6">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="name" className="md:text-right">
                   Nombre
                 </Label>
                 <Input 
                   id="name" 
                   placeholder="Ej. Lavado Express" 
-                  className="col-span-3" 
+                  className="md:col-span-3" 
                   value={formData.name}
                   onChange={handleInputChange}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="price" className="text-right">
-                  Precio
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="price" className="md:text-right">
+                  Precio (USD)
                 </Label>
-                <Input 
-                  id="price" 
-                  placeholder="$0.00" 
-                  className="col-span-3" 
-                  value={formData.price}
-                  onChange={handleInputChange}
-                />
+                <div className="md:col-span-3 space-y-1">
+                  <Input 
+                    id="price" 
+                    placeholder="$0.00" 
+                    type="number"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                  />
+                  {formData.price && (
+                    <p className="text-xs text-muted-foreground">
+                      Equivalente: Bs. {calculateBsEquivalent(formData.price)}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="duration" className="text-right">
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="duration" className="md:text-right">
                   Duración
                 </Label>
                 <Input 
                   id="duration" 
                   placeholder="Ej. 30 min" 
-                  className="col-span-3" 
+                  className="md:col-span-3" 
                   value={formData.duration}
                   onChange={handleInputChange}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="description" className="md:text-right">
                   Descripción
                 </Label>
                 <Textarea 
                   id="description" 
                   placeholder="Descripción del servicio..." 
-                  className="col-span-3" 
+                  className="md:col-span-3" 
                   value={formData.description}
                   onChange={handleInputChange}
                 />
@@ -287,7 +317,14 @@ const Services = () => {
                 <span className="font-semibold">{service.duration}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">{service.price}</span>
+                <div>
+                  <span className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                    ${service.price}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ≈ Bs. {calculateBsEquivalent(service.price)}
+                  </p>
+                </div>
                 <div className="flex gap-2">
                   <Button 
                     size="icon" 

@@ -17,7 +17,7 @@ const MainLayout = () => {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-card">
+          <header className="h-14 md:h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card">
             <SidebarTrigger className="text-foreground" />
             <Button
               variant="ghost"
@@ -26,10 +26,10 @@ const MainLayout = () => {
               className="gap-2 hover:bg-red-500 hover:text-white transition-all duration-300"
             >
               <IoLogOutOutline className="h-5 w-5" />
-              Cerrar Sesión
+              <span className="hidden sm:inline">Cerrar Sesión</span>
             </Button>
           </header>
-          <main className="flex-1 p-6 overflow-auto">
+          <main className="flex-1 p-4 md:p-6 overflow-auto">
             <div className="animate-fade-in">
               <Outlet />
             </div>

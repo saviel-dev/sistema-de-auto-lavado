@@ -48,30 +48,30 @@ interface Appointment {
 const initialAppointments: Appointment[] = [
   {
     id: 1,
-    client: "Juan Pérez",
+    client: "José Rodríguez",
     service: "Lavado Completo",
     date: "2024-01-15",
     time: "10:00 AM",
     status: "Confirmada",
-    phone: "(555) 123-4567",
+    phone: "0414-123-4567",
   },
   {
     id: 2,
-    client: "María García",
+    client: "María González",
     service: "Encerado Premium",
     date: "2024-01-15",
     time: "11:30 AM",
     status: "Pendiente",
-    phone: "(555) 234-5678",
+    phone: "0424-234-5678",
   },
   {
     id: 3,
-    client: "Carlos López",
+    client: "Carlos Pérez",
     service: "Detallado Completo",
     date: "2024-01-15",
     time: "02:00 PM",
     status: "Confirmada",
-    phone: "(555) 345-6789",
+    phone: "0412-345-6789",
   },
   {
     id: 4,
@@ -80,16 +80,16 @@ const initialAppointments: Appointment[] = [
     date: "2024-01-15",
     time: "03:30 PM",
     status: "Pendiente",
-    phone: "(555) 456-7890",
+    phone: "0416-456-7890",
   },
   {
     id: 5,
-    client: "Luis Rodríguez",
+    client: "Luis Hernández",
     service: "Pulido de Faros",
     date: "2024-01-16",
     time: "09:00 AM",
     status: "Completada",
-    phone: "(555) 567-8901",
+    phone: "0426-567-8901",
   },
 ];
 
@@ -208,34 +208,34 @@ const Appointments = () => {
   );
 
   const AppointmentCard = ({ appointment }: { appointment: Appointment }) => (
-    <div className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl bg-card hover:shadow-lg transition-all duration-300 border border-border/50 gap-4 group">
-      <div className="flex items-center gap-4">
-        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-primary font-bold text-lg">
+    <div className="flex flex-col md:flex-row md:items-center justify-between p-3 md:p-4 rounded-xl bg-card hover:shadow-lg transition-all duration-300 border border-border/50 gap-3 md:gap-4 group">
+      <div className="flex items-center gap-3 md:gap-4">
+        <div className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-primary font-bold text-base md:text-lg">
           {appointment.client.charAt(0)}
         </div>
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-foreground text-lg">{appointment.client}</h3>
-            <Badge className={`${getStatusColor(appointment.status)} text-white border-none`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-semibold text-foreground text-base md:text-lg">{appointment.client}</h3>
+            <Badge className={`${getStatusColor(appointment.status)} text-white border-none text-xs`}>
               {appointment.status}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground flex items-center gap-1">
+          <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
             <span className="font-medium text-primary">{appointment.service}</span>
-            <span className="text-xs">•</span>
-            <span>{appointment.phone}</span>
+            <span className="text-xs hidden sm:inline">•</span>
+            <span className="hidden sm:inline">{appointment.phone}</span>
           </p>
         </div>
       </div>
       
-      <div className="flex items-center gap-6 md:justify-end flex-1">
-        <div className="flex flex-col items-end min-w-[100px]">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <IoCalendarOutline className="text-primary" />
+      <div className="flex items-center gap-4 md:gap-6 justify-between md:justify-end flex-1">
+        <div className="flex flex-col items-start md:items-end min-w-[100px]">
+          <div className="flex items-center gap-2 text-xs md:text-sm font-medium">
+            <IoCalendarOutline className="text-primary h-3 w-3 md:h-4 md:w-4" />
             {appointment.date}
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <IoTimeOutline />
+          <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
+            <IoTimeOutline className="h-3 w-3 md:h-4 md:w-4" />
             {appointment.time}
           </div>
         </div>
@@ -273,7 +273,7 @@ const Appointments = () => {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button 
-              className="gap-2 bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg shadow-primary/20"
+              className="gap-2 bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg shadow-primary/20 w-full md:w-auto"
               onClick={handleAddNewClick}
             >
               <IoAddOutline className="h-5 w-5" />
@@ -290,73 +290,73 @@ const Appointments = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 p-6">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="client" className="text-right">
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="client" className="md:text-right">
                   Cliente
                 </Label>
                 <Input 
                   id="client" 
                   placeholder="Nombre del cliente" 
-                  className="col-span-3" 
+                  className="md:col-span-3" 
                   value={formData.client}
                   onChange={handleInputChange}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="service" className="text-right">
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="service" className="md:text-right">
                   Servicio
                 </Label>
                 <Input 
                   id="service" 
                   placeholder="Ej. Lavado Completo" 
-                  className="col-span-3" 
+                  className="md:col-span-3" 
                   value={formData.service}
                   onChange={handleInputChange}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="date" className="text-right">
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="date" className="md:text-right">
                   Fecha
                 </Label>
                 <Input 
                   id="date" 
                   type="date"
-                  className="col-span-3" 
+                  className="md:col-span-3" 
                   value={formData.date}
                   onChange={handleInputChange}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="time" className="text-right">
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="time" className="md:text-right">
                   Hora
                 </Label>
                 <Input 
                   id="time" 
                   type="time"
-                  className="col-span-3" 
+                  className="md:col-span-3" 
                   value={formData.time}
                   onChange={handleInputChange}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="phone" className="text-right">
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="phone" className="md:text-right">
                   Teléfono
                 </Label>
                 <Input 
                   id="phone" 
-                  placeholder="(555) 000-0000" 
-                  className="col-span-3" 
+                  placeholder="0414-000-0000" 
+                  className="md:col-span-3" 
                   value={formData.phone}
                   onChange={handleInputChange}
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="status" className="text-right">
+              <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
+                <Label htmlFor="status" className="md:text-right">
                   Estado
                 </Label>
                 <select
                   id="status"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 col-span-3"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-3"
                   value={formData.status}
                   onChange={handleInputChange}
                 >
@@ -380,24 +380,24 @@ const Appointments = () => {
         </Dialog>
       </div>
 
-      <div className="flex items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">
-        <div className="relative flex-1">
+      <div className="flex flex-col md:flex-row items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">
+        <div className="relative flex-1 w-full">
           <IoSearchOutline className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input 
             placeholder="Buscar por cliente o servicio..." 
-            className="pl-9 bg-background/50 border-muted-foreground/20 focus:border-primary"
+            className="pl-9 bg-background/50 border-muted-foreground/20 focus:border-primary w-full"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground w-full md:w-auto justify-end">
           <IoCalendarOutline className="h-4 w-4" />
           <span>{new Date().toLocaleDateString()}</span>
         </div>
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[400px] bg-muted/50 p-1">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-[400px] h-auto bg-muted/50 p-1 gap-1">
           <TabsTrigger value="all">Todas</TabsTrigger>
           <TabsTrigger value="pending">Pendientes</TabsTrigger>
           <TabsTrigger value="confirmed">Confirmadas</TabsTrigger>

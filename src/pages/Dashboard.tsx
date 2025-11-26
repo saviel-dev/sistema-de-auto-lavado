@@ -1,10 +1,17 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   IoCarSportOutline, 
   IoCalendarOutline, 
   IoPeopleOutline,
-  IoCashOutline 
+  IoCashOutline,
+  IoTrendingUpOutline
 } from "react-icons/io5";
+
+interface DolarData {
+  promedio: number;
+  fechaActualizacion: string;
+}
 
 const statsCards = [
   {
@@ -27,20 +34,59 @@ const statsCards = [
   },
   {
     title: "Ingresos del Día",
-    value: "$1,240",
+    value: "Bs. 320",
     icon: IoCashOutline,
     color: "from-primary to-secondary",
   },
 ];
 
 const recentActivities = [
-  { client: "Juan Pérez", service: "Lavado Completo", time: "10:30 AM", status: "Completado" },
-  { client: "María García", service: "Encerado", time: "11:00 AM", status: "En Proceso" },
-  { client: "Carlos López", service: "Pulido", time: "11:30 AM", status: "Pendiente" },
+  { client: "José Rodríguez", service: "Lavado Completo", time: "10:30 AM", status: "Completado" },
+  { client: "María González", service: "Encerado", time: "11:00 AM", status: "En Proceso" },
+  { client: "Carlos Pérez", service: "Pulido", time: "11:30 AM", status: "Pendiente" },
   { client: "Ana Martínez", service: "Lavado Express", time: "12:00 PM", status: "Completado" },
 ];
 
 const Dashboard = () => {
+  const [dolarData, setDolarData] = useState<DolarData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDolarRate = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+        if (!response.ok) {
+          throw new Error('Error al obtener la tasa del dólar');
+        }
+        const data = await response.json();
+        setDolarData({
+          promedio: data.promedio,
+          fechaActualizacion: data.fechaActualizacion,
+        });
+        setError(null);
+      } catch (err) {
+        setError('No se pudo cargar la tasa');
+        console.error('Error fetching dolar rate:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDolarRate();
+  }, []);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-VE', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -68,6 +114,34 @@ const Dashboard = () => {
           );
         })}
       </div>
+
+      {/* Dollar Exchange Rate Card */}
+      <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-l-4 border-l-green-500">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Dólar Oficial (BCV)
+          </CardTitle>
+          <div className="p-3 rounded-full bg-gradient-to-br from-green-500 to-green-600">
+            <IoTrendingUpOutline className="h-6 w-6 text-white" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-2xl font-semibold text-muted-foreground">Cargando...</div>
+          ) : error ? (
+            <div className="text-xl font-semibold text-red-500">{error}</div>
+          ) : dolarData ? (
+            <>
+              <div className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                Bs. {dolarData.promedio.toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Actualizado: {formatDate(dolarData.fechaActualizacion)}
+              </p>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <Card className="shadow-lg hover:shadow-xl transition-shadow">
         <CardHeader>
