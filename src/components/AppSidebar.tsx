@@ -1,5 +1,5 @@
-import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +13,9 @@ import {
 import { 
   IoSpeedometerOutline,
   IoCarSportOutline,
+  IoLayersOutline,
+  IoSwapHorizontalOutline,
+  IoCashOutline,
   IoCalendarOutline,
   IoPeopleOutline,
   IoSettingsOutline,
@@ -25,12 +28,27 @@ const menuItems = [
     icon: IoSpeedometerOutline,
   },
   {
+    title: "POS",
+    url: "/pos",
+    icon: IoCashOutline,
+  },
+  {
     title: "Servicios",
     url: "/services",
     icon: IoCarSportOutline,
   },
   {
-    title: "Citas",
+    title: "Inventario",
+    url: "/inventory",
+    icon: IoLayersOutline,
+  },
+  {
+    title: "Movimientos",
+    url: "/movements",
+    icon: IoSwapHorizontalOutline,
+  },
+  {
+    title: "Pedidos",
     url: "/appointments",
     icon: IoCalendarOutline,
   },
@@ -68,14 +86,30 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <NavLink
                         to={item.url}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-all relative overflow-hidden group ${
                           isActive
                             ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                             : "text-sidebar-foreground hover:bg-primary/10 hover:text-primary"
                         }`}
                       >
-                        <Icon className="h-5 w-5" />
-                        <span>{item.title}</span>
+                        {({ isActive }) => (
+                          <motion.div
+                            className="flex items-center gap-3 w-full z-10"
+                            whileHover={{ x: 5 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                          >
+                            <Icon className="h-5 w-5" />
+                            <span>{item.title}</span>
+                            {isActive && (
+                              <motion.div
+                                layoutId="active-pill"
+                                className="absolute inset-0 bg-sidebar-accent opacity-100 -z-10 rounded-lg"
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                              />
+                            )}
+                          </motion.div>
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

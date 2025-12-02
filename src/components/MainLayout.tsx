@@ -1,12 +1,13 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { IoLogOutOutline } from "react-icons/io5";
-import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 
 const MainLayout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     navigate("/login");
@@ -29,10 +30,19 @@ const MainLayout = () => {
               <span className="hidden sm:inline">Cerrar Sesión</span>
             </Button>
           </header>
-          <main className="flex-1 p-4 md:p-6 overflow-auto">
-            <div className="animate-fade-in">
-              <Outlet />
-            </div>
+          <main className="flex-1 p-4 md:p-6 overflow-auto overflow-x-hidden">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className="w-full h-full"
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
           </main>
         </div>
       </div>

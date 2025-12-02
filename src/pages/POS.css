@@ -1,0 +1,159 @@
+/* Custom button styles for POS */
+.process-sale-btn {
+  --width: 100%;
+  --height: 36px;
+  --tooltip-height: 35px;
+  --tooltip-width: 120px;
+  --gap-between-tooltip-to-button: 18px;
+  --button-color: #222;
+  --tooltip-color: #fff;
+  width: var(--width);
+  height: var(--height);
+  background: var(--button-color);
+  position: relative;
+  text-align: center;
+  border-radius: 0.45em;
+  font-family: "Inter", sans-serif;
+  transition: background 0.3s;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ... existing code ... */
+
+.process-sale-btn .text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  line-height: 1;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.process-sale-btn::before {
+  position: absolute;
+  content: attr(data-tooltip);
+  width: var(--tooltip-width);
+  height: var(--tooltip-height);
+  background-color: #555;
+  font-size: 0.9rem;
+  color: #fff;
+  border-radius: 0.25em;
+  line-height: var(--tooltip-height);
+  bottom: calc(var(--height) + var(--gap-between-tooltip-to-button) + 10px);
+  left: calc(50% - var(--tooltip-width) / 2);
+}
+
+.process-sale-btn::after {
+  position: absolute;
+  content: "";
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+  border-top-color: #555;
+  left: calc(50% - 10px);
+  bottom: calc(100% + var(--gap-between-tooltip-to-button) - 10px);
+}
+
+.process-sale-btn::after,
+.process-sale-btn::before {
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.5s;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.process-sale-btn .text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.process-sale-btn .button-wrapper,
+.process-sale-btn .text,
+.process-sale-btn .icon {
+  overflow: hidden;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  color: #fff;
+}
+
+.process-sale-btn .text {
+  top: 0;
+}
+
+.process-sale-btn .text,
+.process-sale-btn .icon {
+  transition: top 0.5s;
+}
+
+.process-sale-btn .icon {
+  color: #fff;
+  top: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.process-sale-btn .icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.process-sale-btn:hover {
+  background: #111;
+}
+
+.process-sale-btn:hover .text {
+  top: -100%;
+}
+
+.process-sale-btn:hover .icon {
+  top: 0;
+}
+
+.process-sale-btn:hover:before,
+.process-sale-btn:hover:after {
+  opacity: 1;
+  visibility: visible;
+}
+
+.process-sale-btn:hover:after {
+  bottom: calc(var(--height) + var(--gap-between-tooltip-to-button) - 20px);
+}
+
+.process-sale-btn:hover:before {
+  bottom: calc(var(--height) + var(--gap-between-tooltip-to-button));
+}
+
+.process-sale-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #444;
+}
+
+.process-sale-btn:disabled:hover .text {
+  top: 0;
+}
+
+.process-sale-btn:disabled:hover .icon {
+  top: 100%;
+}
+
+.process-sale-btn:disabled:hover:before,
+.process-sale-btn:disabled:hover:after {
+  opacity: 0;
+  visibility: hidden;
+}

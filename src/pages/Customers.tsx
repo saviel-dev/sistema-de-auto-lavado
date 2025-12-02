@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, ChangeEvent } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,10 @@ import {
   IoCarSportOutline,
   IoMailOutline,
   IoCallOutline,
-  IoCalendarOutline
+  IoCalendarOutline,
+  IoEyeOutline
 } from "react-icons/io5";
+import { FaWhatsapp } from 'react-icons/fa';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,56 +42,47 @@ interface Customer {
   email: string;
   phone: string;
   vehicle: string;
+  vehicleType: string;
+  licensePlate: string;
+  status: "VIP" | "Regular" | "Normal";
   visits: number;
-  status: "VIP" | "Regular" | "Nuevo";
+  image?: string;
 }
 
 const initialCustomers: Customer[] = [
   {
     id: 1,
     name: "Juan Pérez",
-    email: "juan.perez@email.com",
-    phone: "(555) 123-4567",
-    vehicle: "Toyota Corolla 2020",
-    visits: 12,
+    email: "juan@example.com",
+    phone: "584123456789",
+    vehicle: "Toyota Corolla",
+    vehicleType: "Sedán",
+    licensePlate: "ABC123",
     status: "VIP",
+    visits: 0
   },
   {
     id: 2,
-    name: "María García",
-    email: "maria.garcia@email.com",
-    phone: "(555) 234-5678",
-    vehicle: "Honda Civic 2021",
-    visits: 8,
+    name: "María González",
+    email: "maria@example.com",
+    phone: "584123456788",
+    vehicle: "Honda Civic",
+    vehicleType: "Sedán",
+    licensePlate: "DEF456",
     status: "Regular",
+    visits: 0
   },
   {
     id: 3,
-    name: "Carlos López",
-    email: "carlos.lopez@email.com",
-    phone: "(555) 345-6789",
-    vehicle: "Ford F-150 2019",
-    visits: 15,
-    status: "VIP",
-  },
-  {
-    id: 4,
-    name: "Ana Martínez",
-    email: "ana.martinez@email.com",
-    phone: "(555) 456-7890",
-    vehicle: "Mazda CX-5 2022",
-    visits: 5,
-    status: "Regular",
-  },
-  {
-    id: 5,
-    name: "Luis Rodríguez",
-    email: "luis.rodriguez@email.com",
-    phone: "(555) 567-8901",
-    vehicle: "Chevrolet Silverado 2020",
-    visits: 3,
-    status: "Nuevo",
-  },
+    name: "Carlos Rodríguez",
+    email: "carlos@example.com",
+    phone: "584123456787",
+    vehicle: "Ford F-150",
+    vehicleType: "Camioneta",
+    licensePlate: "GHI789",
+    status: "Normal",
+    visits: 0
+  }
 ];
 
 const Customers = () => {
@@ -101,20 +94,43 @@ const Customers = () => {
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Omit<Customer, 'id'>>({
     name: "",
     email: "",
     phone: "",
     vehicle: "",
-    status: "Nuevo" as Customer["status"],
+    vehicleType: "",
+    licensePlate: "",
+    status: "Normal",
+    image: "",
+    visits: 0
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      [id]: value,
+      [id]: value
     }));
+  };
+
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          image: reader.result as string
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   const handleAddNewClick = () => {
@@ -123,7 +139,11 @@ const Customers = () => {
       email: "",
       phone: "",
       vehicle: "",
-      status: "Nuevo",
+      vehicleType: "",
+      licensePlate: "",
+      status: "Normal",
+      image: "",
+      visits: 0
     });
     setEditingId(null);
     setIsDialogOpen(true);
@@ -135,7 +155,11 @@ const Customers = () => {
       email: customer.email,
       phone: customer.phone,
       vehicle: customer.vehicle,
+      vehicleType: customer.vehicleType,
+      licensePlate: customer.licensePlate,
       status: customer.status,
+      image: customer.image || "",
+      visits: customer.visits
     });
     setEditingId(customer.id);
     setIsDialogOpen(true);
@@ -155,7 +179,8 @@ const Customers = () => {
     });
   };
 
-  const handleSaveCustomer = () => {
+  const handleSaveCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!formData.name || !formData.email || !formData.phone) {
       toast({
         title: "Error",
@@ -194,12 +219,13 @@ const Customers = () => {
   const filteredCustomers = customers.filter(customer => 
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.vehicle.toLowerCase().includes(searchTerm.toLowerCase())
+    customer.vehicle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.licensePlate.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Clientes</h1>
           <p className="text-muted-foreground">Gestiona tu base de clientes</p>
@@ -216,88 +242,167 @@ const Customers = () => {
               Nuevo Cliente
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden [&>button]:text-white [&>button]:hover:text-white/80">
-            <DialogHeader className="bg-purple-600 p-6 text-center sm:text-center">
-              <DialogTitle className="text-white text-2xl">
-                {editingId ? "Editar Cliente" : "Agregar Nuevo Cliente"}
-              </DialogTitle>
-              <DialogDescription className="text-purple-100">
-                {editingId ? "Modifique los datos del cliente." : "Complete los datos del nuevo cliente aquí."}
-              </DialogDescription>
+          <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
+            <DialogHeader className="pb-2">
+              <DialogTitle className="text-lg">{editingId ? 'Editar Cliente' : 'Nuevo Cliente'}</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 p-6">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
-                  Nombre
-                </Label>
-                <Input 
-                  id="name" 
-                  placeholder="Nombre completo" 
-                  className="col-span-3" 
-                  value={formData.name}
-                  onChange={handleInputChange}
-                />
+            
+            <div className="space-y-4 py-2">
+              {/* Sección de imagen */}
+              <div className="space-y-1">
+                <Label className="text-sm">Foto del perfil</Label>
+                <div className="flex items-center gap-3">
+                  <div className="relative h-16 w-16 rounded-full overflow-hidden border-2 border-dashed border-muted-foreground/20 flex-shrink-0">
+                    {formData.image ? (
+                      <img 
+                        src={formData.image} 
+                        alt="Preview" 
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-muted/50 flex items-center justify-center">
+                        <IoPeopleOutline className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={triggerFileInput}
+                      className="text-xs h-8"
+                    >
+                      {formData.image ? 'Cambiar foto' : 'Subir foto'}
+                    </Button>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      accept="image/*"
+                      className="hidden"
+                      aria-label="Seleccionar imagen de perfil"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">
-                  Email
-                </Label>
-                <Input 
-                  id="email" 
-                  type="email"
-                  placeholder="correo@ejemplo.com" 
-                  className="col-span-3" 
-                  value={formData.email}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="phone" className="text-right">
-                  Teléfono
-                </Label>
-                <Input 
-                  id="phone" 
-                  placeholder="(555) 000-0000" 
-                  className="col-span-3" 
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="vehicle" className="text-right">
-                  Vehículo
-                </Label>
-                <Input 
-                  id="vehicle" 
-                  placeholder="Ej. Toyota Corolla 2020" 
-                  className="col-span-3" 
-                  value={formData.vehicle}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="status" className="text-right">
-                  Estado
-                </Label>
-                <select
-                  id="status"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 col-span-3"
-                  value={formData.status}
-                  onChange={handleInputChange}
-                >
-                  <option value="Nuevo">Nuevo</option>
-                  <option value="Regular">Regular</option>
-                  <option value="VIP">VIP</option>
-                </select>
+
+              {/* Campos del formulario en pares */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Nombre */}
+                <div className="space-y-1">
+                  <Label htmlFor="name" className="text-sm">Nombre</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Ej: Juan Pérez"
+                    className="h-9 text-sm"
+                    required
+                  />
+                </div>
+
+                {/* Email */}
+                <div className="space-y-1">
+                  <Label htmlFor="email" className="text-sm">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="ejemplo@email.com"
+                    className="h-9 text-sm"
+                    required
+                  />
+                </div>
+
+                {/* Teléfono */}
+                <div className="space-y-1">
+                  <Label htmlFor="phone" className="text-sm">Teléfono</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="Ej: 584123456789"
+                    className="h-9 text-sm"
+                    required
+                  />
+                </div>
+
+                {/* Vehículo */}
+                <div className="space-y-1">
+                  <Label htmlFor="vehicle" className="text-sm">Vehículo</Label>
+                  <Input
+                    id="vehicle"
+                    value={formData.vehicle}
+                    onChange={handleInputChange}
+                    placeholder="Ej: Toyota Corolla"
+                    className="h-9 text-sm"
+                    required
+                  />
+                </div>
+
+                {/* Tipo de vehículo */}
+                <div className="space-y-1">
+                  <Label htmlFor="vehicleType" className="text-sm">Tipo</Label>
+                  <Input
+                    id="vehicleType"
+                    value={formData.vehicleType}
+                    onChange={handleInputChange}
+                    placeholder="Ej: Sedán, SUV, Camioneta"
+                    className="h-9 text-sm"
+                    required
+                  />
+                </div>
+
+                {/* Placa */}
+                <div className="space-y-1">
+                  <Label htmlFor="licensePlate" className="text-sm">Placa</Label>
+                  <Input
+                    id="licensePlate"
+                    value={formData.licensePlate}
+                    onChange={handleInputChange}
+                    placeholder="Ej: ABC123"
+                    className="h-9 text-sm"
+                    required
+                  />
+                </div>
+
+                {/* Estado */}
+                <div className="space-y-1">
+                  <Label htmlFor="status" className="text-sm">Estado</Label>
+                  <select
+                    id="status"
+                    aria-label="Seleccionar estado del cliente"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="Regular">Regular</option>
+                    <option value="VIP">VIP</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <DialogFooter className="p-6 pt-0 sm:justify-center">
+            
+            <DialogFooter className="pt-2">
               <Button 
-                type="submit" 
-                className="bg-purple-600 hover:bg-purple-700 text-white min-w-[150px]"
-                onClick={handleSaveCustomer}
+                variant="outline" 
+                onClick={() => setIsDialogOpen(false)}
+                size="sm"
+                className="h-9"
               >
-                {editingId ? "Actualizar Cliente" : "Guardar Cliente"}
+                Cancelar
+              </Button>
+              <Button 
+                type="button" 
+                onClick={handleSaveCustomer}
+                size="sm"
+                className="h-9"
+              >
+                {editingId ? 'Actualizar' : 'Guardar'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -305,62 +410,86 @@ const Customers = () => {
 
         {/* View Profile Dialog */}
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-          <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden [&>button]:text-white [&>button]:hover:text-white/80">
-            <DialogHeader className="bg-purple-600 p-6 text-center sm:text-center">
-              <div className="mx-auto h-20 w-20 rounded-full bg-white/20 flex items-center justify-center text-white text-3xl font-bold mb-2">
-                {viewingCustomer?.name.charAt(0)}
+          <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden [&>button]:text-muted-foreground [&>button]:hover:text-foreground">
+            <DialogHeader className="bg-gradient-to-r from-purple-600 to-blue-600 p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {viewingCustomer?.image ? (
+                    <img 
+                      src={viewingCustomer.image} 
+                      alt={viewingCustomer.name} 
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '';
+                        target.outerHTML = `
+                          <div class="h-full w-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-500 text-white text-2xl font-bold">
+                            ${viewingCustomer.name?.charAt(0) || 'U'}
+                          </div>
+                        `;
+                      }}
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-500 text-white text-2xl font-bold">
+                      {viewingCustomer?.name?.charAt(0) || 'U'}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <DialogTitle className="text-white text-lg">{viewingCustomer?.name}</DialogTitle>
+                  <p className="text-sm text-white/90">{viewingCustomer?.email}</p>
+                </div>
               </div>
-              <DialogTitle className="text-white text-2xl">
-                {viewingCustomer?.name}
-              </DialogTitle>
-              <DialogDescription className="text-purple-100 flex items-center justify-center gap-2">
-                <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 border-none">
-                  {viewingCustomer?.status}
-                </Badge>
-              </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-6 p-6">
-              <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
-                <div className="p-2 rounded-full bg-primary/10 text-primary">
-                  <IoMailOutline className="h-5 w-5" />
+            
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Teléfono</p>
+                  <p className="text-sm text-muted-foreground">{viewingCustomer?.phone || 'No especificado'}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{viewingCustomer?.email}</p>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Email</p>
+                  <p className="text-sm text-muted-foreground">{viewingCustomer?.email || 'No especificado'}</p>
                 </div>
-              </div>
-              
-              <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
-                <div className="p-2 rounded-full bg-primary/10 text-primary">
-                  <IoCallOutline className="h-5 w-5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Vehículo</p>
+                  <p className="text-sm text-muted-foreground">{viewingCustomer?.vehicle || 'No especificado'}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Teléfono</p>
-                  <p className="font-medium">{viewingCustomer?.phone}</p>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Tipo de vehículo</p>
+                  <p className="text-sm text-muted-foreground">{viewingCustomer?.vehicleType || 'No especificado'}</p>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
-                <div className="p-2 rounded-full bg-primary/10 text-primary">
-                  <IoCarSportOutline className="h-5 w-5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Placa</p>
+                  <p className="text-sm text-muted-foreground font-mono">{viewingCustomer?.licensePlate || 'N/A'}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Vehículo</p>
-                  <p className="font-medium">{viewingCustomer?.vehicle}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
-                <div className="p-2 rounded-full bg-primary/10 text-primary">
-                  <IoCalendarOutline className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Visitas</p>
-                  <p className="font-medium">{viewingCustomer?.visits} visitas</p>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Estado</p>
+                  <Badge 
+                    variant={
+                      viewingCustomer?.status === "VIP" ? "default" : 
+                      viewingCustomer?.status === "Regular" ? "secondary" : "outline"
+                    }
+                    className="text-xs mt-1"
+                  >
+                    {viewingCustomer?.status}
+                  </Badge>
                 </div>
               </div>
             </div>
-            <DialogFooter className="p-6 pt-0 sm:justify-center">
+            
+            <DialogFooter className="px-4 pb-4 gap-2">
+              {viewingCustomer?.phone && (
+                <Button 
+                  variant="outline" 
+                  className="w-full gap-2 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 hover:border-green-300"
+                  onClick={() => window.open(`https://wa.me/${viewingCustomer.phone.replace(/[^0-9]/g, '')}`, '_blank')}
+                >
+                  <FaWhatsapp className="h-4 w-4" />
+                  WhatsApp
+                </Button>
+              )}
               <Button 
                 variant="outline" 
                 className="w-full"
@@ -374,82 +503,95 @@ const Customers = () => {
       </div>
 
       <Card className="shadow-lg hover:shadow-xl transition-shadow">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <div className="bg-primary/10 p-2 rounded-lg">
-                <IoPeopleOutline className="h-6 w-6 text-primary" />
-              </div>
-              Lista de Clientes
-            </CardTitle>
-            <div className="relative w-full md:w-64">
-              <IoSearchOutline className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar cliente..."
-                className="pl-10 focus:ring-2 focus:ring-primary/20 transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {filteredCustomers.map((customer) => (
-              <div
-                key={customer.id}
-                className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-lg bg-gradient-to-r from-muted/30 to-muted/10 hover:shadow-md transition-all duration-300 border border-border/50 gap-4 group"
-              >
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-foreground">{customer.name}</p>
-                    <Badge
-                      variant={customer.status === "VIP" ? "default" : "secondary"}
-                      className={`shadow-sm ${customer.status === "VIP" ? "bg-primary" : ""}`}
-                    >
-                      {customer.status}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{customer.email}</p>
-                  <p className="text-sm text-muted-foreground">{customer.phone}</p>
-                  <p className="text-sm font-semibold text-foreground">{customer.vehicle}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-center px-5 py-3 rounded-lg bg-gradient-to-br from-primary/10 to-secondary/10 shadow-sm">
-                    <p className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">{customer.visits}</p>
-                    <p className="text-xs text-muted-foreground font-medium mt-1">Visitas</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="hover:bg-primary hover:text-primary-foreground transition-all"
-                      onClick={() => handleViewProfile(customer)}
-                    >
-                      Ver Perfil
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-black">
-                          <IoEllipsisVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditClick(customer)}>
-                          <IoPencilOutline className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="cursor-pointer text-red-600 focus:text-red-600" onClick={() => handleDeleteClick(customer.id)}>
-                          <IoTrashOutline className="mr-2 h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </div>
-            ))}
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-4">Cliente</th>
+                    <th className="text-left p-4">Vehículo</th>
+                    <th className="text-left p-4">Placa</th>
+                    <th className="text-left p-4">Tipo</th>
+                    <th className="text-left p-4">Estado</th>
+                    <th className="p-4 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCustomers.map((customer) => (
+                    <tr key={customer.id} className="border-b hover:bg-muted/50">
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-muted overflow-hidden flex-shrink-0">
+                            {customer.image ? (
+                              <img 
+                                src={customer.image} 
+                                alt={customer.name}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  target.src = '';
+                                }}
+                              />
+                            ) : (
+                              <div className="h-full w-full bg-primary/10 flex items-center justify-center">
+                                <IoPeopleOutline className="h-5 w-5 text-primary" />
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium">{customer.name}</div>
+                            <div className="text-sm text-muted-foreground">{customer.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-medium">{customer.vehicle}</div>
+                        <div className="text-sm text-muted-foreground">{customer.phone}</div>
+                      </td>
+                      <td className="p-4 font-mono">{customer.licensePlate}</td>
+                      <td className="p-4">{customer.vehicleType}</td>
+                      <td className="p-4">
+                        <Badge 
+                          variant={
+                            customer.status === "VIP" ? "default" : 
+                            customer.status === "Regular" ? "secondary" : "outline"
+                          }
+                        >
+                          {customer.status}
+                        </Badge>
+                      </td>
+                      <td className="p-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <IoEllipsisVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewProfile(customer)}>
+                              <IoEyeOutline className="mr-2 h-4 w-4" />
+                              Ver perfil
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditClick(customer)}>
+                              <IoPencilOutline className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => handleDeleteClick(customer.id)}
+                            >
+                              <IoTrashOutline className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>

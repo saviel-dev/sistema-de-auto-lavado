@@ -7,6 +7,9 @@ import Login from "./pages/Login";
 import MainLayout from "./components/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
+import Inventory from "./pages/Inventory";
+import Movements from "./pages/Movements";
+import POS from "./pages/POS";
 import Appointments from "./pages/Appointments";
 import Customers from "./pages/Customers";
 import Settings from "./pages/Settings";
@@ -25,7 +28,10 @@ const App = () => (
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/pos" element={<POS />} />
             <Route path="/services" element={<Services />} />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/movements" element={<Movements />} />
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/customers" element={<Customers />} />
             <Route path="/settings" element={<Settings />} />
