@@ -188,7 +188,7 @@ const Services = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <Toaster />
       <motion.div 
         className="space-y-6"
@@ -198,13 +198,13 @@ const Services = () => {
       >
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Servicios</h1>
-            <p className="text-muted-foreground">Gestiona los servicios de tu negocio</p>
+            <h1 className="text-2xl md:text-3xl font-bold">Servicios</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Gestiona los servicios de tu negocio</p>
           </div>
           <motion.div variants={itemVariants}>
             <Button 
               onClick={handleAddNewClick} 
-              className="gap-2"
+              className="gap-2 w-full md:w-auto"
             >
               <IoAddOutline className="h-5 w-5" />
               Nuevo Servicio
@@ -213,7 +213,7 @@ const Services = () => {
         </div>
 
       <motion.div 
-        className="rounded-md border overflow-hidden shadow-sm"
+        className="hidden lg:block rounded-md border overflow-hidden shadow-sm"
         variants={itemVariants}
       >
         <div className="relative w-full overflow-auto">
@@ -280,6 +280,72 @@ const Services = () => {
             </tbody>
           </table>
         </div>
+      </motion.div>
+
+      {/* Vista de cards para móvil y tablet */}
+      <motion.div className="lg:hidden space-y-4" variants={itemVariants}>
+        {services.map((service, index) => (
+          <motion.div
+            key={service.id}
+            custom={index}
+            variants={itemVariants}
+            className="bg-card border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start gap-3 flex-1">
+                <div className="mt-1">
+                  <IoCubeOutline className="h-5 w-5 text-primary flex-shrink-0" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base mb-1 break-words">{service.name}</h3>
+                  {service.popular && (
+                    <Badge className="bg-gradient-to-r from-primary to-secondary text-xs mb-2">
+                      Popular
+                    </Badge>
+                  )}
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {service.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between pt-3 border-t">
+              <div className="space-y-1">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">USD: </span>
+                  <span className="text-primary font-bold">
+                    ${parseFloat(service.price).toFixed(2)}
+                  </span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Bs: </span>
+                  <span className="text-primary font-bold">
+                    {calculateBsPrice(service.price)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-9 w-9"
+                  onClick={() => handleEditClick(service)}
+                >
+                  <IoPencilOutline className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={(e) => handleDeleteService(e, service.id)}
+                >
+                  <IoTrashOutline className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        ))}
       </motion.div>
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => !open && setIsDialogOpen(false)}>

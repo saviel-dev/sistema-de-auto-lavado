@@ -185,7 +185,7 @@ const Movements = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <Toaster />
       <motion.div 
         className="space-y-6"
@@ -195,13 +195,13 @@ const Movements = () => {
       >
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Movimientos</h1>
-            <p className="text-muted-foreground">Registra entradas y salidas de inventario</p>
+            <h1 className="text-2xl md:text-3xl font-bold">Movimientos</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Registra entradas y salidas de inventario</p>
           </div>
           <motion.div variants={itemVariants}>
             <Button 
               onClick={handleAddNewClick} 
-              className="gap-2"
+              className="gap-2 w-full md:w-auto"
             >
               <IoAddOutline className="h-5 w-5" />
               Nuevo Movimiento
@@ -226,8 +226,9 @@ const Movements = () => {
           </div>
         </motion.div>
 
+        {/* Vista de tabla para desktop */}
         <motion.div 
-          className="rounded-md border overflow-hidden shadow-sm"
+          className="hidden lg:block rounded-md border overflow-hidden shadow-sm"
           variants={itemVariants}
         >
           <div className="relative w-full overflow-auto">
@@ -290,6 +291,67 @@ const Movements = () => {
               </tbody>
             </table>
           </div>
+        </motion.div>
+
+        {/* Vista de cards para móvil y tablet */}
+        <motion.div className="lg:hidden space-y-4" variants={itemVariants}>
+          {filteredMovements.map((movement, index) => (
+            <motion.div
+              key={movement.id}
+              custom={index}
+              variants={itemVariants}
+              className="bg-card border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="mt-1">
+                    <IoSwapHorizontalOutline className="h-5 w-5 text-primary flex-shrink-0" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold text-base break-words">{movement.productName}</h3>
+                      <Badge 
+                        className={`gap-1 ${
+                          movement.type === "entry" 
+                            ? "bg-green-100 text-green-800 hover:bg-green-100" 
+                            : "bg-red-100 text-red-800 hover:bg-red-100"
+                        }`}
+                      >
+                        {movement.type === "entry" ? (
+                          <>
+                            <IoArrowUpOutline className="h-3 w-3" />
+                            Entrada
+                          </>
+                        ) : (
+                          <>
+                            <IoArrowDownOutline className="h-3 w-3" />
+                            Salida
+                          </>
+                        )}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {movement.reason}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between pt-3 border-t">
+                <div className="space-y-1">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Cantidad: </span>
+                    <span className={`font-bold ${movement.type === "entry" ? "text-green-600" : "text-red-600"}`}>
+                      {movement.type === "entry" ? "+" : "-"}{movement.quantity}
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {new Date(movement.date).toLocaleDateString('es-ES')}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
         </motion.div>
 
         <Dialog open={isDialogOpen} onOpenChange={(open) => !open && setIsDialogOpen(false)}>
