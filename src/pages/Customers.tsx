@@ -224,18 +224,18 @@ const Customers = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Clientes</h1>
-          <p className="text-muted-foreground">Gestiona tu base de clientes</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Clientes</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Gestiona tu base de clientes</p>
         </div>
         
         {/* Add/Edit Customer Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button 
-              className="gap-2 bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+              className="gap-2 w-full md:w-auto bg-gradient-to-r from-primary to-secondary hover:opacity-90"
               onClick={handleAddNewClick}
             >
               <IoAddOutline className="h-5 w-5" />
@@ -502,7 +502,7 @@ const Customers = () => {
         </Dialog>
       </div>
 
-      <Card className="shadow-lg hover:shadow-xl transition-shadow">
+      <Card className="hidden lg:block shadow-lg hover:shadow-xl transition-shadow">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -595,6 +595,99 @@ const Customers = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-4">
+        {filteredCustomers.map((customer) => (
+          <Card key={customer.id} className="shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-4">
+                <div className="h-12 w-12 rounded-full bg-muted overflow-hidden flex-shrink-0 border">
+                  {customer.image ? (
+                    <img 
+                      src={customer.image} 
+                      alt={customer.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = '';
+                      }}
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-primary/10 flex items-center justify-center">
+                      <IoPeopleOutline className="h-6 w-6 text-primary" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold text-base truncate pr-2">{customer.name}</h3>
+                      <p className="text-sm text-muted-foreground truncate">{customer.email}</p>
+                    </div>
+                    <Badge 
+                      variant={
+                        customer.status === "VIP" ? "default" : 
+                        customer.status === "Regular" ? "secondary" : "outline"
+                      }
+                      className="flex-shrink-0"
+                    >
+                      {customer.status}
+                    </Badge>
+                  </div>
+                  
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <IoCarSportOutline className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{customer.vehicle}</span>
+                      <span className="text-muted-foreground text-xs">({customer.vehicleType})</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="bg-muted px-2 py-0.5 rounded text-xs font-mono">
+                        {customer.licensePlate}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t flex items-center justify-between gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1 h-9"
+                  onClick={() => handleViewProfile(customer)}
+                >
+                  <IoEyeOutline className="mr-2 h-4 w-4" />
+                  Ver
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-9 w-9">
+                      <IoEllipsisVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleEditClick(customer)}>
+                      <IoPencilOutline className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      className="text-destructive"
+                      onClick={() => handleDeleteClick(customer.id)}
+                    >
+                      <IoTrashOutline className="mr-2 h-4 w-4" />
+                      Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };

@@ -99,10 +99,10 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-        <p className="text-muted-foreground">Resumen general de operaciones</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Resumen general de operaciones</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -158,10 +158,10 @@ const Dashboard = () => {
             {recentActivities.map((activity, index) => (
               <div
                 key={index}
-                className="group flex items-center justify-between p-4 hover:bg-muted/30 transition-all duration-200 hover:pl-6"
+                className="group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 hover:bg-muted/30 transition-all duration-200 hover:pl-6 gap-3 sm:gap-4"
               >
-                <div className="flex items-center gap-4">
-                  <div className={`p-2.5 rounded-lg ${
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  <div className={`p-2.5 rounded-lg flex-shrink-0 ${
                     activity.status === "Completado"
                       ? "bg-green-100 text-green-600"
                       : activity.status === "En Proceso"
@@ -176,17 +176,17 @@ const Dashboard = () => {
                       <IoAlertCircle className="h-5 w-5" />
                     )}
                   </div>
-                  <div>
-                    <p className="font-medium text-foreground group-hover:text-primary transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground group-hover:text-primary transition-colors truncate">
                       {activity.client}
                     </p>
-                    <p className="text-sm text-muted-foreground">{activity.service}</p>
+                    <p className="text-sm text-muted-foreground truncate">{activity.service}</p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-sm font-medium text-muted-foreground">{activity.time}</span>
+                <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-0 w-full sm:w-auto justify-between sm:justify-end">
+                  <span className="text-sm font-medium text-muted-foreground order-1 sm:order-none">{activity.time}</span>
                   <span
-                    className={`mt-1 px-3 py-1 rounded-full text-xs font-medium ${
+                    className={`px-3 py-1 rounded-full text-xs font-medium order-2 sm:order-none sm:mt-1 ${
                       activity.status === "Completado"
                         ? "bg-green-50 text-green-700 border border-green-100"
                         : activity.status === "En Proceso"

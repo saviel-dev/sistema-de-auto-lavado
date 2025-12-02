@@ -189,8 +189,8 @@ const POS = () => {
     if (!lastSale) return;
 
     const doc = new jsPDF();
-    const primaryColor = [29, 78, 216]; // Blue-700
-    const grayColor = [107, 114, 128]; // Gray-500
+    const primaryColor: [number, number, number] = [29, 78, 216]; // Blue-700
+    const grayColor: [number, number, number] = [107, 114, 128]; // Gray-500
     
     // Encabezado
     doc.setFontSize(22);
@@ -283,7 +283,7 @@ const POS = () => {
   };
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
+    <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
       <Toaster />
       <motion.div 
         className="flex flex-col gap-6"
@@ -291,10 +291,10 @@ const POS = () => {
         animate="visible"
         variants={containerVariants}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">POS - Punto de Venta</h1>
-            <p className="text-muted-foreground mt-1">Procesa ventas de servicios y productos</p>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">POS - Punto de Venta</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">Procesa ventas de servicios y productos</p>
           </div>
         </div>
 
