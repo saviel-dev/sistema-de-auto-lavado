@@ -15,7 +15,10 @@ import {
   IoMailOutline,
   IoCallOutline,
   IoCalendarOutline,
-  IoEyeOutline
+  IoEyeOutline,
+  IoReloadOutline,
+  IoImagesOutline,
+  IoCloseCircle
 } from "react-icons/io5";
 import { FaWhatsapp } from 'react-icons/fa';
 import {
@@ -35,64 +38,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
-
-interface Customer {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  vehicle: string;
-  vehicleType: string;
-  licensePlate: string;
-  status: "VIP" | "Regular" | "Normal";
-  visits: number;
-  image?: string;
-}
-
-const initialCustomers: Customer[] = [
-  {
-    id: 1,
-    name: "Juan Pérez",
-    email: "juan@example.com",
-    phone: "584123456789",
-    vehicle: "Toyota Corolla",
-    vehicleType: "Sedán",
-    licensePlate: "ABC123",
-    status: "VIP",
-    visits: 0
-  },
-  {
-    id: 2,
-    name: "María González",
-    email: "maria@example.com",
-    phone: "584123456788",
-    vehicle: "Honda Civic",
-    vehicleType: "Sedán",
-    licensePlate: "DEF456",
-    status: "Regular",
-    visits: 0
-  },
-  {
-    id: 3,
-    name: "Carlos Rodríguez",
-    email: "carlos@example.com",
-    phone: "584123456787",
-    vehicle: "Ford F-150",
-    vehicleType: "Camioneta",
-    licensePlate: "GHI789",
-    status: "Normal",
-    visits: 0
-  }
-];
+import { useCustomers, Customer } from "@/contexts/CustomerContext";
 
 const Customers = () => {
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const { customers, loading, addCustomer, updateCustomer, deleteCustomer, refreshCustomers, uploadImage } = useCustomers();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
   const { toast } = useToast();
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   const [formData, setFormData] = useState<Omit<Customer, 'id'>>({
     name: "",
@@ -103,9 +59,11 @@ const Customers = () => {
     licensePlate: "",
     status: "Normal",
     image: "",
+    images: [],
     visits: 0
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -115,22 +73,59 @@ const Customers = () => {
     }));
   };
 
-  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  /* Perfil */
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      try {
+        setUploadingImages(true);
+        const url = await uploadImage(file);
+        setFormData(prev => ({ ...prev, image: url }));
+        toast({ title: "Foto subida correctamente" });
+      } catch (error) {
+        // Error handling in context
+      } finally {
+        setUploadingImages(false);
+      }
+    }
+  };
+
+  /* Galería */
+  const handleGalleryUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      try {
+        setUploadingImages(true);
+        const uploadPromises = Array.from(files).map(file => uploadImage(file));
+        const urls = await Promise.all(uploadPromises);
+        
         setFormData(prev => ({
           ...prev,
-          image: reader.result as string
+          images: [...(prev.images || []), ...urls]
         }));
-      };
-      reader.readAsDataURL(file);
+        
+        toast({ title: "Galería actualizada", description: `${urls.length} fotos subidas.` });
+      } catch (error) {
+        // Error handled in context
+      } finally {
+        setUploadingImages(false);
+      }
     }
+  };
+
+  const removeGalleryImage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images?.filter((_, i) => i !== index) || []
+    }));
   };
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
+  };
+
+  const triggerGalleryInput = () => {
+    galleryInputRef.current?.click();
   };
 
   const handleAddNewClick = () => {
@@ -143,6 +138,7 @@ const Customers = () => {
       licensePlate: "",
       status: "Normal",
       image: "",
+      images: [],
       visits: 0
     });
     setEditingId(null);
@@ -159,6 +155,7 @@ const Customers = () => {
       licensePlate: customer.licensePlate,
       status: customer.status,
       image: customer.image || "",
+      images: customer.images || [],
       visits: customer.visits
     });
     setEditingId(customer.id);
@@ -170,16 +167,13 @@ const Customers = () => {
     setIsProfileOpen(true);
   };
 
-  const handleDeleteClick = (id: number) => {
-    setCustomers(customers.filter((c) => c.id !== id));
-    toast({
-      title: "Eliminado",
-      description: "El cliente ha sido eliminado.",
-      variant: "destructive",
-    });
+  const handleDeleteClick = async (id: number) => {
+    if (confirm('¿Estás seguro de eliminar este cliente?')) {
+      await deleteCustomer(id);
+    }
   };
 
-  const handleSaveCustomer = (e: React.FormEvent) => {
+  const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.phone) {
       toast({
@@ -190,30 +184,16 @@ const Customers = () => {
       return;
     }
 
-    if (editingId) {
-      setCustomers(customers.map(c => 
-        c.id === editingId 
-          ? { ...c, ...formData, id: editingId }
-          : c
-      ));
-      toast({
-        title: "Actualizado",
-        description: "Cliente actualizado correctamente.",
-      });
-    } else {
-      const newCustomer: Customer = {
-        id: Date.now(),
-        visits: 0,
-        ...formData,
-      };
-      setCustomers([...customers, newCustomer]);
-      toast({
-        title: "Éxito",
-        description: "Cliente agregado correctamente.",
-      });
+    try {
+      if (editingId) {
+        await updateCustomer(editingId, formData);
+      } else {
+        await addCustomer(formData);
+      }
+      setIsDialogOpen(false);
+    } catch (error) {
+      // Toast ya manejado en context
     }
-
-    setIsDialogOpen(false);
   };
 
   const filteredCustomers = customers.filter(customer => 
@@ -227,7 +207,12 @@ const Customers = () => {
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Clientes</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Clientes</h1>
+            <Button variant="ghost" size="icon" onClick={() => refreshCustomers()} disabled={loading}>
+              <IoReloadOutline className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
           <p className="text-sm md:text-base text-muted-foreground">Gestiona tu base de clientes</p>
         </div>
         
@@ -385,6 +370,53 @@ const Customers = () => {
                   </select>
                 </div>
               </div>
+
+              {/* Sección Galería */}
+              <div className="space-y-2 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Galería de Fotos del Vehículo (6-10)</Label>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={triggerGalleryInput}
+                    disabled={uploadingImages}
+                    className="h-8 gap-2"
+                  >
+                    <IoImagesOutline className="h-4 w-4" />
+                    {uploadingImages ? 'Subiendo...' : 'Agregar Fotos'}
+                  </Button>
+                  <input
+                    type="file"
+                    ref={galleryInputRef}
+                    onChange={handleGalleryUpload}
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                  />
+                </div>
+                
+                {formData.images && formData.images.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2 mt-2">
+                     {formData.images.map((img, index) => (
+                       <div key={index} className="relative group aspect-square rounded-md overflow-hidden bg-muted border">
+                         <img src={img} alt={`Foto ${index}`} className="w-full h-full object-cover" />
+                         <button
+                           type="button"
+                           onClick={() => removeGalleryImage(index)}
+                           className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                         >
+                           <IoCloseCircle className="h-4 w-4" />
+                         </button>
+                       </div>
+                     ))}
+                  </div>
+                ) : (
+                  <div className="p-4 border-2 border-dashed rounded-md text-center text-muted-foreground text-sm">
+                    No hay fotos en la galería
+                  </div>
+                )}
+              </div>
             </div>
             
             <DialogFooter className="pt-2">
@@ -443,6 +475,20 @@ const Customers = () => {
             </DialogHeader>
             
             <div className="p-4">
+              {/* Galería en Perfil */}
+              {viewingCustomer?.images && viewingCustomer.images.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm font-medium mb-2">Galería de Fotos</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {viewingCustomer.images.map((img, idx) => (
+                      <div key={idx} className="aspect-square rounded-md overflow-hidden bg-muted border cursor-pointer hover:opacity-90" onClick={() => window.open(img, '_blank')}>
+                        <img src={img} alt="Vehículo" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Teléfono</p>
@@ -507,7 +553,7 @@ const Customers = () => {
           <div className="overflow-x-auto">
             <table className="w-full">
                 <thead>
-                  <tr className="border-b">
+                  <tr className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
                     <th className="text-left p-4">Cliente</th>
                     <th className="text-left p-4">Vehículo</th>
                     <th className="text-left p-4">Placa</th>

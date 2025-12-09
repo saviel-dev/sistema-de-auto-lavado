@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { IoAddOutline, IoTrashOutline, IoPencilOutline, IoCubeOutline } from "react-icons/io5";
+import { IoAddOutline, IoTrashOutline, IoPencilOutline, IoCubeOutline, IoReloadOutline } from "react-icons/io5";
 import {
   Dialog,
   DialogContent,
@@ -16,41 +16,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Toaster } from "@/components/ui/toaster";
-
-interface Service {
-  id: number;
-  name: string;
-  description: string;
-  price: string;
-  popular: boolean;
-}
-
-const initialServices: Service[] = [
-  {
-    id: 1,
-    name: "Lavado Express",
-    description: "Lavado exterior rápido y eficiente",
-    price: "5",
-    popular: false,
-  },
-  {
-    id: 2,
-    name: "Lavado Completo",
-    description: "Lavado exterior e interior profundo",
-    price: "10",
-    popular: true,
-  },
-  {
-    id: 3,
-    name: "Encerado Premium",
-    description: "Encerado profesional con cera de alta calidad",
-    price: "20",
-    popular: true,
-  },
-];
+import { Service, useServices } from "@/contexts/ServiceContext";
 
 const Services = () => {
-  const [services, setServices] = useState<Service[]>(initialServices);
+  const { services, loading, addService, updateService, deleteService, refreshServices } = useServices();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [dolarRate, setDolarRate] = useState<number | null>(null);
@@ -84,13 +53,14 @@ const Services = () => {
     }));
   };
 
-  const calculateBsPrice = (usdPrice: string) => {
+  const calculateBsPrice = (usdPrice: string | number) => {
     if (!dolarRate) return 'Cargando...';
-    const price = parseFloat(usdPrice) || 0;
+    const price = typeof usdPrice === 'string' ? parseFloat(usdPrice) : usdPrice;
+    if (isNaN(price)) return '0.00';
     return (price * dolarRate).toFixed(2);
   };
 
-  const handleSaveService = (e: React.FormEvent) => {
+  const handleSaveService = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.price) {
       toast({
@@ -101,90 +71,105 @@ const Services = () => {
       return;
     }
 
-    if (editingId !== null) {
-      setServices(services.map(service => 
-        service.id === editingId 
-          ? { 
-              ...service, 
-              name: formData.name, 
-              description: formData.description, 
-              price: formData.price 
-            } 
-          : service
-      ));
-      toast({
-        title: "Servicio actualizado",
-        description: "El servicio ha sido actualizado exitosamente.",
-      });
-    } else {
-      const newService: Service = {
-        id: Date.now(),
-        name: formData.name,
-        description: formData.description,
-        price: formData.price,
-        popular: false,
-      };
-      setServices([...services, newService]);
-      toast({
-        title: "Servicio agregado",
-        description: "El servicio ha sido agregado exitosamente.",
-      });
+    try {
+      const price = parseFloat(formData.price) || 0;
+      
+      if (editingId) {
+        await updateService(editingId, {
+          name: formData.name,
+          description: formData.description,
+          price: price
+        });
+        toast({
+          title: "Servicio actualizado",
+          description: "Los cambios se han guardado correctamente.",
+        });
+      } else {
+        await addService({
+          name: formData.name,
+          description: formData.description,
+          price: price,
+          popular: false
+        });
+        toast({
+          title: "Servicio creado",
+          description: "El nuevo servicio ha sido agregado.",
+        });
+      }
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      // Error handling is done in context
     }
+  };
 
-    setFormData({ name: "", price: "", description: "" });
+  const handleDeleteService = async (id: number) => {
+    if (confirm("¿Estás seguro de que deseas eliminar este servicio?")) {
+      try {
+        await deleteService(id);
+        toast({
+          title: "Servicio eliminado",
+          description: "El servicio ha sido eliminado del catálogo.",
+          variant: "destructive",
+        });
+      } catch (error) {
+        // Error handling in context
+      }
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      price: "",
+      description: "",
+    });
     setEditingId(null);
-    setIsDialogOpen(false);
   };
 
   const handleEditClick = (service: Service) => {
     setFormData({
       name: service.name,
-      price: service.price,
+      price: service.price.toString(),
       description: service.description,
     });
     setEditingId(service.id);
     setIsDialogOpen(true);
   };
 
-  const handleDeleteService = (e: React.MouseEvent, id: number) => {
-    e.stopPropagation();
-    setServices(services.filter(service => service.id !== id));
-    toast({
-      title: "Servicio eliminado",
-      description: "El servicio ha sido eliminado exitosamente.",
-    });
-  };
-
-  const handleAddNewClick = () => {
-    setFormData({ name: "", price: "", description: "" });
-    setEditingId(null);
+  const handleAddNew = () => {
+    resetForm();
     setIsDialogOpen(true);
+  };
+  
+  const togglePopular = async (id: number, currentStatus: boolean) => {
+    try {
+      await updateService(id, { popular: !currentStatus });
+    } catch (error) {
+      // Error handling
+    }
   };
 
   const containerVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      y: 0,
       transition: {
-        duration: 0.5,
-        ease: [0.22, 1, 0.36, 1],
         staggerChildren: 0.1
       }
     }
   };
 
   const itemVariants: Variants = {
-    hidden: { opacity: 0, y: 10 },
-    visible: (i: number = 0) => ({
-      opacity: 1,
+    hidden: { y: 20, opacity: 0 },
+    visible: {
       y: 0,
-      transition: { 
-        duration: 0.4,
-        ease: [0.22, 1, 0.36, 1],
-        delay: i * 0.1
+      opacity: 1,
+      transition: {
+        type: "spring",
+        stiffness: 100
       }
-    })
+    }
   };
 
   return (
@@ -196,15 +181,20 @@ const Services = () => {
         animate="visible"
         variants={containerVariants}
       >
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Servicios</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-bold">Servicios</h1>
+               <Button variant="ghost" size="icon" onClick={() => refreshServices()} disabled={loading}>
+                 <IoReloadOutline className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+               </Button>
+            </div>
             <p className="text-sm md:text-base text-muted-foreground">Gestiona los servicios de tu negocio</p>
           </div>
           <motion.div variants={itemVariants}>
             <Button 
-              onClick={handleAddNewClick} 
-              className="gap-2 w-full md:w-auto"
+              onClick={handleAddNew} 
+              className="gap-2 w-full md:w-auto bg-gradient-to-r from-blue-600 to-cyan-500"
             >
               <IoAddOutline className="h-5 w-5" />
               Nuevo Servicio
@@ -228,55 +218,67 @@ const Services = () => {
               </tr>
             </thead>
             <tbody className="[&_tr:last-child]:border-0">
-              {services.map((service, index) => (
-                <motion.tr 
-                  key={service.id} 
-                  className="border-b transition-colors hover:bg-muted/50"
-                  custom={index}
-                  variants={itemVariants}
-                >
-                  <td className="p-4 text-center align-middle font-medium">
-                    <div className="flex items-center justify-center gap-2">
-                      <IoCubeOutline className="h-5 w-5 text-primary" />
-                      <span>{service.name}</span>
-                      {service.popular && (
-                        <Badge className="ml-2 bg-gradient-to-r from-primary to-secondary">
-                          Popular
-                        </Badge>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4 text-center align-middle text-muted-foreground">
-                    {service.description}
-                  </td>
-                  <td className="p-4 text-center align-middle font-medium">
- ${parseFloat(service.price).toFixed(2)}
-                  </td>
-                  <td className="p-4 text-center align-middle font-medium">
-                    {`Bs. ${calculateBsPrice(service.price)}`}
-                  </td>
-                  <td className="p-4 text-center align-middle">
-                    <div className="flex justify-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => handleEditClick(service)}
-                      >
-                        <IoPencilOutline className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={(e) => handleDeleteService(e, service.id)}
-                      >
-                        <IoTrashOutline className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </motion.tr>
-              ))}
+              {loading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={i} className="border-b transition-colors hover:bg-muted/50">
+                    <td className="p-4 text-center align-middle font-medium"><div className="h-4 bg-muted/50 rounded animate-pulse w-3/4 mx-auto"></div></td>
+                    <td className="p-4 text-center align-middle text-muted-foreground"><div className="h-4 bg-muted/50 rounded animate-pulse w-full"></div></td>
+                    <td className="p-4 text-center align-middle font-medium"><div className="h-4 bg-muted/50 rounded animate-pulse w-1/2 mx-auto"></div></td>
+                    <td className="p-4 text-center align-middle font-medium"><div className="h-4 bg-muted/50 rounded animate-pulse w-1/2 mx-auto"></div></td>
+                    <td className="p-4 text-center align-middle"><div className="flex justify-center gap-2"><div className="h-8 w-8 bg-muted/50 rounded-full animate-pulse"></div><div className="h-8 w-8 bg-muted/50 rounded-full animate-pulse"></div></div></td>
+                  </tr>
+                ))
+              ) : (
+                services.map((service, index) => (
+                  <motion.tr 
+                    key={service.id} 
+                    className="border-b transition-colors hover:bg-muted/50"
+                    custom={index}
+                    variants={itemVariants}
+                  >
+                    <td className="p-4 text-center align-middle font-medium">
+                      <div className="flex items-center justify-center gap-2">
+                        <IoCubeOutline className="h-5 w-5 text-primary" />
+                        <span>{service.name}</span>
+                        {service.popular && (
+                          <Badge className="ml-2 bg-gradient-to-r from-primary to-secondary">
+                            Popular
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 text-center align-middle text-muted-foreground">
+                      {service.description}
+                    </td>
+                    <td className="p-4 text-center align-middle font-medium">
+   ${parseFloat(service.price.toString()).toFixed(2)}
+                    </td>
+                    <td className="p-4 text-center align-middle font-medium">
+                      {`Bs. ${calculateBsPrice(service.price)}`}
+                    </td>
+                    <td className="p-4 text-center align-middle">
+                      <div className="flex justify-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleEditClick(service)}
+                        >
+                          <IoPencilOutline className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteService(service.id)}
+                        >
+                          <IoTrashOutline className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -284,68 +286,68 @@ const Services = () => {
 
       {/* Vista de cards para móvil y tablet */}
       <motion.div className="lg:hidden space-y-4" variants={itemVariants}>
-        {services.map((service, index) => (
+        {loading ? (
+             Array.from({ length: 3 }).map((_, i) => (
+               <div key={i} className="h-40 rounded-xl bg-muted/50 animate-pulse" />
+             ))
+        ) : (
+          services.map((service, index) => (
           <motion.div
             key={service.id}
             custom={index}
             variants={itemVariants}
-            className="bg-card border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+            className="bg-card border rounded-xl overflow-hidden shadow-sm"
           >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-start gap-3 flex-1">
-                <div className="mt-1">
-                  <IoCubeOutline className="h-5 w-5 text-primary flex-shrink-0" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-base mb-1 break-words">{service.name}</h3>
+            {/* ... card content ... */}
+            <div className="p-4 space-y-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-lg">{service.name}</h3>
                   {service.popular && (
-                    <Badge className="bg-gradient-to-r from-primary to-secondary text-xs mb-2">
+                    <Badge variant="secondary" className="mt-1 bg-yellow-500/10 text-yellow-600 border-yellow-200">
                       Popular
                     </Badge>
                   )}
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {service.description}
-                  </p>
+                </div>
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                  <IoCubeOutline className="h-5 w-5" />
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center justify-between pt-3 border-t">
-              <div className="space-y-1">
-                <div className="text-sm">
-                  <span className="text-muted-foreground">USD: </span>
-                  <span className="text-primary font-bold">
-                    ${parseFloat(service.price).toFixed(2)}
-                  </span>
+              
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {service.description}
+              </p>
+
+              <div className="flex items-end justify-between pt-2 border-t border-dashed">
+                <div>
+                  <div className="text-xl font-bold">
+                    ${parseFloat(service.price.toString()).toFixed(2)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Bs. {calculateBsPrice(service.price)}
+                  </div>
                 </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Bs: </span>
-                  <span className="text-primary font-bold">
-                    {calculateBsPrice(service.price)}
-                  </span>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => handleEditClick(service)}
+                  >
+                    <IoPencilOutline className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDeleteService(service.id)}
+                  >
+                    <IoTrashOutline className="h-4 w-4" />
+                  </Button>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-9 w-9"
-                  onClick={() => handleEditClick(service)}
-                >
-                  <IoPencilOutline className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={(e) => handleDeleteService(e, service.id)}
-                >
-                  <IoTrashOutline className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           </motion.div>
-        ))}
+        )))}
       </motion.div>
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => !open && setIsDialogOpen(false)}>

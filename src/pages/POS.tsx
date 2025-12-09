@@ -436,6 +436,15 @@ const POS = () => {
       return;
     }
 
+    if (!selectedCustomer) {
+      toast({
+        title: "Cliente requerido",
+        description: "Debes seleccionar un cliente antes de procesar la venta.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!paymentMethod) {
       toast({
         title: "Método de pago requerido",
@@ -899,7 +908,7 @@ const POS = () => {
 
                 {/* Customer Selection Section */}
                 <div className="space-y-3 pb-4 border-b">
-                  <label className="text-sm font-medium">Cliente (Opcional):</label>
+                  <label className="text-sm font-medium">Cliente *:</label>
                   <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
                     <PopoverTrigger asChild>
                       <div className="relative w-full">
@@ -1113,7 +1122,7 @@ const POS = () => {
                     className="w-full h-12 text-lg font-semibold shadow-md" 
                     size="lg"
                     onClick={processSale}
-                    disabled={cart.length === 0 || !paymentMethod}
+                    disabled={cart.length === 0 || !paymentMethod || !selectedCustomer}
                   >
                     Procesar Venta
                   </Button>
