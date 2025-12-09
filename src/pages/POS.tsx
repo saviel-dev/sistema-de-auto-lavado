@@ -27,8 +27,7 @@ import {
   IoDocumentTextOutline,
   IoCarSportOutline,
   IoScanOutline,
-  IoBarcodeOutline,
-  IoAlertCircleOutline
+  IoBarcodeOutline
 } from "react-icons/io5";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { formatBarcode } from "@/lib/barcodeUtils";
@@ -432,16 +431,6 @@ const POS = () => {
       toast({
         title: "Carrito vacío",
         description: "Agrega items al carrito antes de procesar la venta.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // VALIDACIÓN OBLIGATORIA DE CLIENTE
-    if (!selectedCustomer) {
-      toast({
-        title: "Cliente requerido",
-        description: "Debes seleccionar un cliente antes de procesar la venta.",
         variant: "destructive",
       });
       return;
@@ -945,7 +934,6 @@ const POS = () => {
                           <span className="flex items-center gap-2">
                             <IoPersonOutline className="h-4 w-4" />
                             Seleccionar cliente
-                            <span className="text-destructive">*</span>
                           </span>
                         )}
                       </Button>
@@ -1044,23 +1032,6 @@ const POS = () => {
                     </div>
                   )}
 
-                  {/* Alert cuando no hay cliente seleccionado */}
-                  {!selectedCustomer && (
-                    <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <IoAlertCircleOutline className="h-5 w-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                            Cliente requerido
-                          </p>
-                          <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
-                            Debes seleccionar un cliente antes de procesar la venta
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Quick Action Buttons */}
                   <div className="grid grid-cols-3 gap-2">
                     <Button
@@ -1142,7 +1113,7 @@ const POS = () => {
                     className="w-full h-12 text-lg font-semibold shadow-md" 
                     size="lg"
                     onClick={processSale}
-                    disabled={cart.length === 0 || !paymentMethod || !selectedCustomer}
+                    disabled={cart.length === 0 || !paymentMethod}
                   >
                     Procesar Venta
                   </Button>
