@@ -20,6 +20,7 @@ import {
   IoPeopleOutline,
   IoSettingsOutline,
   IoBarChartOutline,
+  IoFlaskOutline,
 } from "react-icons/io5";
 
 const menuItems = [
@@ -42,6 +43,11 @@ const menuItems = [
     title: "Inventario",
     url: "/inventory",
     icon: IoLayersOutline,
+  },
+  {
+    title: "Insumos",
+    url: "/consumables",
+    icon: IoFlaskOutline,
   },
   {
     title: "Movimientos",

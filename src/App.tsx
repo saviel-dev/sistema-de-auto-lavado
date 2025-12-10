@@ -11,6 +11,7 @@ import MainLayout from "./components/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
 import Inventory from "./pages/Inventory";
+import Consumables from "./pages/Consumables";
 import Movements from "./pages/Movements";
 import POS from "./pages/POS";
 import Orders from "./pages/Orders";
@@ -20,6 +21,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import BarcodeTestPanel from "./pages/BarcodeTestPanel";
 import { ProductProvider } from "./contexts/ProductContext";
+import { ConsumablesProvider } from "./contexts/ConsumablesContext";
 import { SalesProvider } from "./contexts/SalesContext";
 import { MovementProvider } from "./contexts/MovementContext";
 import { CustomerProvider } from "./contexts/CustomerContext";
@@ -52,8 +54,9 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ProductProvider>
-          <MovementProvider>
-            <CustomerProvider>
+          <ConsumablesProvider>
+            <MovementProvider>
+              <CustomerProvider>
               <ServiceProvider>
                 <SalesProvider>
                   <OrderProvider>
@@ -69,6 +72,7 @@ const App = () => {
                             <Route path="/pos" element={<POS />} />
                             <Route path="/services" element={<Services />} />
                             <Route path="/inventory" element={<Inventory />} />
+                            <Route path="/consumables" element={<Consumables />} />
                             <Route path="/movements" element={<Movements />} />
                             <Route path="/appointments" element={<Orders />} />
                             <Route path="/customers" element={<Customers />} />
@@ -87,8 +91,9 @@ const App = () => {
               </ServiceProvider>
             </CustomerProvider>
           </MovementProvider>
-        </ProductProvider>
-      </AuthProvider>
+        </ConsumablesProvider>
+      </ProductProvider>
+    </AuthProvider>
     </QueryClientProvider>
   );
 }
