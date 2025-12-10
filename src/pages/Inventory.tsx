@@ -14,7 +14,8 @@ import {
   IoScanOutline,
   IoBarcodeOutline,
   IoCheckmarkCircleOutline,
-  IoAlertCircleOutline
+  IoAlertCircleOutline,
+  IoReloadOutline
 } from "react-icons/io5";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { validateBarcode, formatBarcode } from "@/lib/barcodeUtils";
@@ -37,19 +38,19 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-
-
 const Inventory = () => {
-  const { products, addProduct, updateProduct, deleteProduct } = useProducts();
+  const { products, loading, addProduct, updateProduct, deleteProduct, refreshProducts } = useProducts();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [dolarRate, setDolarRate] = useState<number | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [showDescription, setShowDescription] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [barcodeSearch, setBarcodeSearch] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -87,26 +88,28 @@ const Inventory = () => {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
         setImagePreview(result);
         setFormData(prev => ({
           ...prev,
-          image: result
+          image: result // Still keep base64 for immediate preview if needed, or clear it if submitting file
         }));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const calculateBsPrice = (usdPrice: string) => {
+  const calculateBsPrice = (usdPrice: string | number) => {
     if (!dolarRate) return 'Cargando...';
-    const price = parseFloat(usdPrice) || 0;
+    const price = typeof usdPrice === 'string' ? parseFloat(usdPrice) : usdPrice;
+    if (isNaN(price)) return '0.00';
     return (price * dolarRate).toFixed(2);
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.price) {
       toast({
@@ -142,42 +145,37 @@ const Inventory = () => {
       }
     }
 
-    if (editingId !== null) {
-      updateProduct(editingId, {
-        name: formData.name,
-        description: formData.description,
-        price: formData.price,
-        category: formData.category,
-        stock: parseInt(formData.stock) || 0,
-        image: formData.image || products.find(p => p.id === editingId)?.image || "",
-        // barcode is not editable
-      });
-      toast({
-        title: "Producto actualizado",
-        description: "El producto ha sido actualizado exitosamente.",
-      });
-    } else {
-      const newProduct: Product = {
-        id: Date.now(),
-        name: formData.name,
-        description: formData.description,
-        price: formData.price,
-        category: formData.category,
-        stock: parseInt(formData.stock) || 0,
-        image: formData.image || "https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=400&h=300&fit=crop",
-        barcode: formData.barcode || undefined,
-      };
-      addProduct(newProduct);
-      toast({
-        title: "Producto agregado",
-        description: "El producto ha sido agregado exitosamente.",
-      });
+    setIsSubmitting(true);
+    try {
+      if (editingId !== null) {
+        await updateProduct(editingId, {
+          name: formData.name,
+          description: formData.description,
+          price: formData.price,
+          category: formData.category,
+          stock: parseInt(formData.stock) || 0,
+          barcode: formData.barcode,
+          // image_url is handled by updateProduct via selectedFile
+        }, selectedFile);
+        
+      } else {
+        await addProduct({
+          name: formData.name,
+          description: formData.description,
+          price: formData.price,
+          category: formData.category,
+          stock: parseInt(formData.stock) || 0,
+          image: "", // Placeholder, context handles upload
+          barcode: formData.barcode || undefined,
+        }, selectedFile);
+      }
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      // Error is handled in context
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setFormData({ name: "", price: "", description: "", category: "", stock: "", image: "", barcode: "" });
-    setImagePreview("");
-    setEditingId(null);
-    setIsDialogOpen(false);
   };
 
   const handleEditClick = (product: Product) => {
@@ -191,53 +189,44 @@ const Inventory = () => {
       barcode: product.barcode || "",
     });
     setImagePreview(product.image);
+    setSelectedFile(undefined); // Reset selected file on edit
     setShowDescription(!!product.description);
     setEditingId(product.id);
     setIsDialogOpen(true);
   };
 
-  const handleDeleteProduct = (e: React.MouseEvent, id: number) => {
+  const handleDeleteProduct = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
-    deleteProduct(id);
-    toast({
-      title: "Producto eliminado",
-      description: "El producto ha sido eliminado exitosamente.",
-    });
+    if(confirm("¿Estás seguro de que quieres eliminar este producto?")) {
+      await deleteProduct(id);
+    }
   };
 
   const handleAddNewClick = () => {
+    resetForm();
+    setIsDialogOpen(true);
+  };
+  
+  const resetForm = () => {
     setFormData({ name: "", price: "", description: "", category: "", stock: "", image: "", barcode: "" });
     setImagePreview("");
+    setSelectedFile(undefined);
     setShowDescription(false);
     setEditingId(null);
-    setIsDialogOpen(true);
   };
 
   const handleBarcodeScanned = (barcode: string) => {
-    // Search for product with this barcode
     const existingProduct = products.find(p => p.barcode === barcode);
     
     if (existingProduct) {
-      // Product exists - open edit form
       handleEditClick(existingProduct);
       toast({
         title: "Producto encontrado",
         description: `${existingProduct.name} - ${formatBarcode(barcode)}`,
       });
     } else {
-      // Product doesn't exist - open new product form with barcode pre-filled
-      setFormData({ 
-        name: "", 
-        price: "", 
-        description: "", 
-        category: "", 
-        stock: "", 
-        image: "",
-        barcode: barcode 
-      });
-      setImagePreview("");
-      setShowDescription(false);
-      setEditingId(null);
+      resetForm();
+      setFormData(prev => ({ ...prev, barcode: barcode }));
       setIsDialogOpen(true);
       toast({
         title: "Producto no encontrado",
@@ -246,13 +235,11 @@ const Inventory = () => {
     }
   };
 
-  // Get unique categories
   const categories = ["all", ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
 
-  // Filter products based on search and category
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (product.barcode && product.barcode.includes(searchTerm));
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
     const matchesBarcode = !barcodeSearch || (product.barcode && product.barcode.includes(barcodeSearch));
@@ -296,7 +283,12 @@ const Inventory = () => {
       >
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Inventario</h1>
+            <div className="flex items-center gap-2">
+                <h1 className="text-2xl md:text-3xl font-bold">Inventario</h1>
+                <Button variant="ghost" size="icon" onClick={() => refreshProducts()} disabled={loading}>
+                  <IoReloadOutline className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                </Button>
+            </div>
             <p className="text-sm md:text-base text-muted-foreground">Gestiona los productos de tu negocio</p>
           </div>
           <motion.div variants={itemVariants} className="flex gap-2">
@@ -310,7 +302,7 @@ const Inventory = () => {
             </Button>
             <Button 
               onClick={handleAddNewClick} 
-              className="gap-2"
+              className="gap-2 bg-gradient-to-r from-blue-600 to-cyan-500"
             >
               <IoAddOutline className="h-5 w-5" />
               Nuevo Producto
@@ -349,7 +341,12 @@ const Inventory = () => {
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
           variants={containerVariants}
         >
-          {filteredProducts.map((product, index) => (
+          {loading ? (
+             Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-[350px] rounded-xl bg-muted/50 animate-pulse" />
+             ))
+          ) : (
+          filteredProducts.map((product, index) => (
             <motion.div
               key={product.id}
               custom={index}
@@ -357,20 +354,31 @@ const Inventory = () => {
             >
               <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
                 <div className="relative h-48 w-full overflow-hidden bg-muted">
-                  <img 
-                    src={product.image} 
-                    alt={product.name}
-                    className="h-full w-full object-cover transition-transform duration-300 hover:scale-110"
-                  />
+                    {product.image ? (
+                        <img 
+                            src={product.image} 
+                            alt={product.name}
+                            className="h-full w-full object-cover transition-transform duration-300 hover:scale-110"
+                        />
+                    ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-secondary/30">
+                            <IoCubeOutline className="h-12 w-12 text-muted-foreground/30" />
+                        </div>
+                    )}
+                  
                   {product.barcode && (
                     <div className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm rounded-md px-2 py-1 flex items-center gap-1 shadow-sm">
                       <IoBarcodeOutline className="h-3 w-3 text-primary" />
                       <span className="text-xs font-mono font-medium">{formatBarcode(product.barcode)}</span>
                     </div>
                   )}
+                  {/* Stock Badge */}
+                  <div className={`absolute bottom-2 left-2 px-2 py-0.5 rounded text-xs font-medium ${product.stock > 10 ? 'bg-green-100 text-green-700' : product.stock > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-destructive/10 text-destructive'}`}>
+                    Stock: {product.stock}
+                  </div>
                 </div>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">
+                  <CardTitle className="text-lg line-clamp-1">
                     {product.name}
                   </CardTitle>
                 </CardHeader>
@@ -387,9 +395,14 @@ const Inventory = () => {
                         Bs. {calculateBsPrice(product.price)}
                       </span>
                     </div>
+                    {product.category && (
+                        <div className="text-xs text-white mt-2 inline-block px-2 py-1 bg-primary rounded-full font-medium">
+                            {product.category}
+                        </div>
+                    )}
                   </div>
                 </CardContent>
-                <CardFooter className="gap-2 justify-center">
+                <CardFooter className="gap-2 justify-center pt-0 pb-4 px-4">
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -411,7 +424,8 @@ const Inventory = () => {
                 </CardFooter>
               </Card>
             </motion.div>
-          ))}
+          ))
+          )}
         </motion.div>
 
         <Dialog open={isDialogOpen} onOpenChange={(open) => !open && setIsDialogOpen(false)}>
@@ -517,7 +531,7 @@ const Inventory = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="stock" className="text-right">
-                  Stock mínimo
+                  Stock inicial
                 </Label>
                 <Input
                   id="stock"
@@ -602,11 +616,16 @@ const Inventory = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
-              <Button type="submit" onClick={(e) => handleSaveProduct(e)}>
-                {editingId !== null ? 'Actualizar' : 'Guardar'}
+              <Button type="submit" onClick={(e) => handleSaveProduct(e)} disabled={isSubmitting}>
+                {isSubmitting ? (
+                    <>
+                        <IoReloadOutline className="mr-2 h-4 w-4 animate-spin" />
+                        Guardando...
+                    </>
+                ) : editingId !== null ? 'Actualizar' : 'Guardar'}
               </Button>
             </DialogFooter>
           </DialogContent>

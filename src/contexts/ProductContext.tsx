@@ -1,4 +1,7 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 export interface Product {
   id: number;
@@ -13,92 +16,187 @@ export interface Product {
 
 interface ProductContextType {
   products: Product[];
-  addProduct: (product: Product) => void;
-  updateProduct: (id: number, updates: Partial<Product>) => void;
-  deleteProduct: (id: number) => void;
-  updateStock: (productId: number, quantity: number, type: 'add' | 'subtract') => void;
+  loading: boolean;
+  addProduct: (product: Omit<Product, 'id'>, imageFile?: File) => Promise<void>;
+  updateProduct: (id: number, updates: Partial<Product>, imageFile?: File) => Promise<void>;
+  deleteProduct: (id: number) => Promise<void>;
+  updateStock: (productId: number, quantity: number, type: 'add' | 'subtract') => Promise<void>;
   getProductById: (id: number) => Product | undefined;
   getProductByBarcode: (barcode: string) => Product | undefined;
   checkStockAvailability: (productId: number, quantity: number) => boolean;
+  refreshProducts: () => Promise<void>;
 }
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
-const initialProducts: Product[] = [
-  {
-    id: 1,
-    name: "Cera Premium",
-    description: "Cera de alta calidad para protección y brillo duradero",
-    price: "15",
-    image: "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=400&h=300&fit=crop",
-    category: "Cuidado",
-    stock: 25,
-    barcode: "7501234567890",
-  },
-  {
-    id: 2,
-    name: "Shampoo Automotriz",
-    description: "Shampoo concentrado pH neutro para lavado profesional",
-    price: "8",
-    image: "https://images.unsplash.com/photo-1563298723-dcfebaa392e3?w=400&h=300&fit=crop",
-    category: "Limpieza",
-    stock: 40,
-    barcode: "7501234567906",
-  },
-  {
-    id: 3,
-    name: "Microfibra Premium",
-    description: "Paños de microfibra ultra absorbentes",
-    price: "5",
-    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=400&h=300&fit=crop",
-    category: "Accesorios",
-    stock: 60,
-    barcode: "7501234567913",
-  },
-  {
-    id: 4,
-    name: "Aromatizante",
-    description: "Aromatizante de larga duración",
-    price: "3",
-    image: "https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=400&h=300&fit=crop",
-    category: "Accesorios",
-    stock: 50,
-    barcode: "7501234567920",
-  },
-];
-
 export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [products, setProducts] = useState<Product[]>(() => {
-    const stored = localStorage.getItem('products');
-    return stored ? JSON.parse(stored) : initialProducts;
-  });
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('productos')
+        .select('*')
+        .order('nombre', { ascending: true });
+
+      if (error) throw error;
+
+      const mappedProducts: Product[] = data.map((item: any) => ({
+        id: item.id,
+        name: item.nombre,
+        description: item.descripcion,
+        price: item.precio,
+        image: item.imagen_url,
+        category: item.categoria,
+        stock: item.stock,
+        barcode: item.codigo_barras
+      }));
+
+      setProducts(mappedProducts);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast.error('Error al cargar productos');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem('products', JSON.stringify(products));
-  }, [products]);
+    fetchProducts();
+  }, []);
 
-  const addProduct = (product: Product) => {
-    setProducts(prev => [...prev, product]);
-  };
+  const uploadImage = async (file: File): Promise<string> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
 
-  const updateProduct = (id: number, updates: Partial<Product>) => {
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-  };
+      const { error: uploadError } = await supabase.storage
+        .from('productos')
+        .upload(filePath, file);
 
-  const deleteProduct = (id: number) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
-  };
-
-  const updateStock = (productId: number, quantity: number, type: 'add' | 'subtract') => {
-    setProducts(prev => prev.map(p => {
-      if (p.id === productId) {
-        const newStock = type === 'add' 
-          ? p.stock + quantity 
-          : Math.max(0, p.stock - quantity);
-        return { ...p, stock: newStock };
+      if (uploadError) {
+        throw uploadError;
       }
-      return p;
-    }));
+
+      const { data } = supabase.storage
+        .from('productos')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  };
+
+  const addProduct = async (product: Omit<Product, 'id'>, imageFile?: File) => {
+    try {
+      let imageUrl = product.image;
+
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      }
+
+      const { error } = await supabase
+        .from('productos')
+        .insert([{
+          nombre: product.name,
+          descripcion: product.description,
+          precio: product.price,
+          imagen_url: imageUrl,
+          categoria: product.category,
+          stock: product.stock,
+          codigo_barras: product.barcode
+        }]);
+
+      if (error) throw error;
+
+      toast.success('Producto agregado exitosamente');
+      await fetchProducts();
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast.error('Error al agregar producto');
+      throw error;
+    }
+  };
+
+  const updateProduct = async (id: number, updates: Partial<Product>, imageFile?: File) => {
+    try {
+      let imageUrl = updates.image;
+
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      }
+
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.nombre = updates.name;
+      if (updates.description !== undefined) dbUpdates.descripcion = updates.description;
+      if (updates.price !== undefined) dbUpdates.precio = updates.price;
+      if (imageUrl !== undefined) dbUpdates.imagen_url = imageUrl;
+      if (updates.category !== undefined) dbUpdates.categoria = updates.category;
+      if (updates.stock !== undefined) dbUpdates.stock = updates.stock;
+      if (updates.barcode !== undefined) dbUpdates.codigo_barras = updates.barcode;
+
+      const { error } = await supabase
+        .from('productos')
+        .update(dbUpdates)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Producto actualizado exitosamente');
+      await fetchProducts();
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast.error('Error al actualizar producto');
+      throw error;
+    }
+  };
+
+  const deleteProduct = async (id: number) => {
+    try {
+      const { error } = await supabase
+        .from('productos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Producto eliminado exitosamente');
+      await fetchProducts();
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast.error('Error al eliminar producto');
+      throw error;
+    }
+  };
+
+  const updateStock = async (productId: number, quantity: number, type: 'add' | 'subtract') => {
+    try {
+      const product = products.find(p => p.id === productId);
+      if (!product) throw new Error('Product not found');
+
+      const newStock = type === 'add' 
+        ? product.stock + quantity 
+        : Math.max(0, product.stock - quantity);
+
+      const { error } = await supabase
+        .from('productos')
+        .update({ stock: newStock })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      // Optimistic update or refresh
+      await fetchProducts();
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      toast.error('Error al actualizar stock');
+      throw error;
+    }
   };
 
   const getProductById = (id: number): Product | undefined => {
@@ -118,6 +216,7 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
     <ProductContext.Provider
       value={{
         products,
+        loading,
         addProduct,
         updateProduct,
         deleteProduct,
@@ -125,6 +224,7 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
         getProductById,
         getProductByBarcode,
         checkStockAvailability,
+        refreshProducts: fetchProducts
       }}
     >
       {children}
