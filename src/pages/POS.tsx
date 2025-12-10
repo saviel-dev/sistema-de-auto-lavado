@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion, Variants } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -27,12 +28,19 @@ import {
   IoDocumentTextOutline,
   IoCarSportOutline,
   IoScanOutline,
-  IoBarcodeOutline
+  IoBarcodeOutline,
+  IoReloadOutline,
+  IoMailOutline,
+  IoCarOutline,
+  IoImageOutline
 } from "react-icons/io5";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { formatBarcode } from "@/lib/barcodeUtils";
-import { useProducts } from "@/contexts/ProductContext";
-import { useMovements } from "@/contexts/MovementContext";
+import { useProducts, Product } from "@/contexts/ProductContext";
+import { useServices, Service } from "@/contexts/ServiceContext";
+import { useCustomers, Customer } from "@/contexts/CustomerContext";
+import { useSales, SaleItem } from "@/contexts/SalesContext"; // Import from new context
+
 import {
   Card,
   CardContent,
@@ -72,241 +80,51 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-interface CartItem {
-  id: string;
-  type: "service" | "product";
-  itemId: number;
-  name: string;
-  price: number;
-  quantity: number;
+interface POSCartItem extends SaleItem {
+    // Extend if needed, but SaleItem has structure:
+    // { id?: string, type, itemId, name, price, quantity }
+    // We used 'id' as cartItemId in local state, SaleItem has optional id.
+    // Let's use 'cartId' for local loop key to avoid confusion
+    cartId: string;
 }
-
-interface Service {
-  id: number;
-  name: string;
-  price: string;
-}
-
-interface Product {
-  id: number;
-  name: string;
-  price: string;
-  barcode?: string;
-}
-
-interface Customer {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  vehicle: string;
-  vehicleType: string;
-  licensePlate: string;
-  status: "VIP" | "Regular" | "Normal";
-  visits: number;
-  images?: string[];
-}
-
-interface Order {
-  id: number;
-  orderType: "walk-in" | "appointment";
-  customerId: number;
-  customerName: string;
-  customerVehicle?: string;
-  services: number[];
-  serviceNames: string[];
-  status: "Pendiente" | "Confirmada" | "En Proceso" | "Completada" | "Cancelada";
-  date: string;
-  time: string;
-  totalAmount: number;
-  notes?: string;
-}
-
-interface Appointment {
-  id: number;
-  client: string;
-  service: string;
-  date: string;
-  time: string;
-  status: "Pendiente" | "Confirmada" | "Completada" | "Cancelada";
-  phone: string;
-}
-
-// Datos de clientes
-const customers: Customer[] = [
-  {
-    id: 1,
-    name: "Juan Pérez",
-    email: "juan@example.com",
-    phone: "584123456789",
-    vehicle: "Toyota Corolla",
-    vehicleType: "Sedán",
-    licensePlate: "ABC123",
-    status: "VIP",
-    visits: 0
-  },
-  {
-    id: 2,
-    name: "María González",
-    email: "maria@example.com",
-    phone: "584123456788",
-    vehicle: "Honda Civic",
-    vehicleType: "Sedán",
-    licensePlate: "DEF456",
-    status: "Regular",
-    visits: 0
-  },
-  {
-    id: 3,
-    name: "Carlos Rodríguez",
-    email: "carlos@example.com",
-    phone: "584123456787",
-    vehicle: "Ford F-150",
-    vehicleType: "Camioneta",
-    licensePlate: "GHI789",
-    status: "Normal",
-    visits: 0
-  }
-];
-
-// Datos de ejemplo
-const services: Service[] = [
-  { id: 1, name: "Lavado Express", price: "5" },
-  { id: 2, name: "Lavado Completo", price: "10" },
-  { id: 3, name: "Encerado Premium", price: "20" },
-  { id: 4, name: "Pulido", price: "25" },
-];
-
-
 
 const POS = () => {
-  const { products, updateStock, checkStockAvailability } = useProducts();
-  const { registerSaleMovements } = useMovements();
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const { products, checkStockAvailability, refreshProducts } = useProducts();
+  const { services, refreshServices } = useServices();
+  const { customers, addCustomer, refreshCustomers, uploadImage } = useCustomers(); 
+  const { createSale, loading: saleLoading } = useSales();
+
+  const [cart, setCart] = useState<POSCartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [dolarRate, setDolarRate] = useState<number | null>(null);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
   const [lastSale, setLastSale] = useState<{ id: string; total: number } | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   // Customer selection states
-  const [customers, setCustomers] = useState<Customer[]>([
-    {
-      id: 1,
-      name: "Juan Pérez",
-      email: "juan@example.com",
-      phone: "584123456789",
-      vehicle: "Toyota Corolla",
-      vehicleType: "Sedán",
-      licensePlate: "ABC123",
-      status: "VIP",
-      visits: 0
-    },
-    {
-      id: 2,
-      name: "María González",
-      email: "maria@example.com",
-      phone: "584123456788",
-      vehicle: "Honda Civic",
-      vehicleType: "Sedán",
-      licensePlate: "DEF456",
-      status: "Regular",
-      visits: 0
-    },
-    {
-      id: 3,
-      name: "Carlos Rodríguez",
-      email: "carlos@example.com",
-      phone: "584123456787",
-      vehicle: "Ford F-150",
-      vehicleType: "Camioneta",
-      licensePlate: "GHI789",
-      status: "Normal",
-      visits: 0
-    }
-  ]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  
   const filteredCustomers = customers.filter(customer => 
     customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
     customer.phone.includes(customerSearchQuery) ||
     (customer.licensePlate && customer.licensePlate.toLowerCase().includes(customerSearchQuery.toLowerCase()))
   );
 
-  const handleCreateCustomer = (newCustomer: Customer) => {
-    const updatedCustomers = [...customers, newCustomer];
-    setCustomers(updatedCustomers);
-    setSelectedCustomer(newCustomer);
-    localStorage.setItem('customers', JSON.stringify(updatedCustomers));
-    setIsCustomerDialogOpen(false);
-    
-    // Reset form
-    setCustomerFormData({
-      name: "",
-      email: "",
-      phone: "",
-      vehicle: "",
-      vehicleType: "",
-      licensePlate: "",
-      status: "Normal",
-      images: [],
-    });
-  };
-
-  const handleCreateOrder = () => {
-    if (!selectedCustomer) {
-      toast({
-        title: "Cliente requerido",
-        description: "Por favor selecciona o crea un cliente primero.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setOrderFormData({
-      ...orderFormData,
-      customerId: selectedCustomer.id,
-      customerName: selectedCustomer.name,
-      customerVehicle: selectedCustomer.vehicle,
-    });
-    
-    setIsOrderDialogOpen(true);
-  };
-
-  const handleCreateAppointment = () => {
-    if (!selectedCustomer) {
-      toast({
-        title: "Cliente requerido",
-        description: "Por favor selecciona o crea un cliente primero.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setAppointmentFormData({
-      ...appointmentFormData,
-      client: selectedCustomer.name,
-      phone: selectedCustomer.phone,
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-    });
-    
-    setIsAppointmentDialogOpen(true);
-  };
-
-  const clearSelectedCustomer = () => {
-    setSelectedCustomer(null);
-  };
-
   // Dialog states
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
-  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
-  const [isAppointmentDialogOpen, setIsAppointmentDialogOpen] = useState(false);
   
-  // Customer form data
+  // Custom Customer Form Data (local state for the form)
   const [customerFormData, setCustomerFormData] = useState({
     name: "",
     email: "",
@@ -315,34 +133,12 @@ const POS = () => {
     vehicleType: "",
     licensePlate: "",
     status: "Normal" as "VIP" | "Regular" | "Normal",
-    images: [] as string[],
+    image: "", // Profile image (preview base64 or url)
+    images: [] as string[], // Gallery images (preview base64s)
   });
-  
-  // Order form data  
-  const [orderFormData, setOrderFormData] = useState({
-    orderType: "walk-in" as "walk-in" | "appointment",
-    customerId: 0,
-    customerName: "",
-    customerVehicle: "",
-    services: [] as number[],
-    serviceNames: [] as string[],
-    status: "Pendiente" as Order["status"],
-    date: "",
-    time: "",
-    notes: "",
-  });
-  
-  // Appointment form data
-  const [appointmentFormData, setAppointmentFormData] = useState({
-    client: "",
-    service: "",
-    date: "",
-    time: "",
-    phone: "",
-    status: "Pendiente" as Appointment["status"],
-  });
-  
-  const [servicesPopoverOpen, setServicesPopoverOpen] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [galleryImageFiles, setGalleryImageFiles] = useState<File[]>([]);
+  const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
 
   useEffect(() => {
     const fetchDolarRate = async () => {
@@ -357,40 +153,60 @@ const POS = () => {
     };
 
     fetchDolarRate();
-    
-    // Load customers from localStorage
-    const storedCustomers = localStorage.getItem('customers');
-    if (storedCustomers) {
-      setCustomers(JSON.parse(storedCustomers));
-    }
+    refreshProducts();
+    refreshServices();
+    refreshCustomers();
   }, []);
 
   const addToCart = (type: "service" | "product", item: Service | Product) => {
     const cartItemId = `${type}-${item.id}`;
-    const existingItem = cart.find(ci => ci.id === cartItemId);
+    const existingItem = cart.find(ci => ci.cartId === cartItemId);
 
     if (existingItem) {
-      // Si es un producto, incrementar cantidad
       if (type === "product") {
+        // Chequear stock antes de agregar
+        const product = item as Product;
+        if (!checkStockAvailability(product.id, existingItem.quantity + 1)) {
+           toast({
+             title: "Stock insuficiente",
+             description: `No hay suficiente stock de ${product.name}`,
+             variant: "destructive"
+           });
+           return;
+        }
+
         setCart(cart.map(ci => 
-          ci.id === cartItemId 
+          ci.cartId === cartItemId 
             ? { ...ci, quantity: ci.quantity + 1 }
             : ci
         ));
       } else {
-        // Para servicios, simplemente notificar que ya está agregado
         toast({
           title: "Servicio ya agregado",
           description: "Este servicio ya está en el carrito.",
         });
       }
     } else {
-      const newItem: CartItem = {
-        id: cartItemId,
+       // Chequear stock inicial para productos
+       if (type === "product") {
+         const product = item as Product;
+         if (!checkStockAvailability(product.id, 1)) {
+            toast({
+              title: "Stock insuficiente",
+              description: `No hay suficiente stock de ${product.name}`,
+              variant: "destructive"
+            });
+            return;
+         }
+       }
+
+      const newItem: POSCartItem = {
+        cartId: cartItemId,
         type,
         itemId: item.id,
         name: item.name,
-        price: parseFloat(item.price),
+        // @ts-ignore - Handle string/number price difference safely
+        price: parseFloat(item.price.toString()),
         quantity: 1,
       };
       setCart([...cart, newItem]);
@@ -402,19 +218,32 @@ const POS = () => {
   };
 
   const removeFromCart = (cartItemId: string) => {
-    setCart(cart.filter(item => item.id !== cartItemId));
+    setCart(cart.filter(item => item.cartId !== cartItemId));
   };
 
   const updateQuantity = (cartItemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
       removeFromCart(cartItemId);
-    } else {
-      setCart(cart.map(item => 
-        item.id === cartItemId 
-          ? { ...item, quantity: newQuantity }
-          : item
-      ));
+      return;
     }
+
+    const item = cart.find(i => i.cartId === cartItemId);
+    if (item && item.type === 'product') {
+       if (!checkStockAvailability(item.itemId, newQuantity)) {
+          toast({
+             title: "Stock insuficiente",
+             description: "No puedes agregar más cantidad de la disponible.",
+             variant: "destructive"
+           });
+           return;
+       }
+    }
+
+    setCart(cart.map(item => 
+      item.cartId === cartItemId 
+        ? { ...item, quantity: newQuantity }
+        : item
+    ));
   };
 
   const calculateSubtotal = () => {
@@ -426,7 +255,7 @@ const POS = () => {
     return (usdPrice * dolarRate).toFixed(2);
   };
 
-  const processSale = () => {
+  const processSale = async () => {
     if (cart.length === 0) {
       toast({
         title: "Carrito vacío",
@@ -455,10 +284,19 @@ const POS = () => {
     }
 
     const total = calculateSubtotal();
-    const saleId = `#${Date.now().toString().slice(-6)}`;
     
-    setLastSale({ id: saleId, total });
-    setShowThankYouModal(true);
+    // Call context to create sale
+    const success = await createSale(selectedCustomer.id, cart, paymentMethod, total);
+
+    if (success) {
+        const saleId = `#${Date.now().toString().slice(-6)}`;
+        setLastSale({ id: saleId, total });
+        
+        // Refresh products to show updated stock
+        await refreshProducts(); 
+        
+        setShowThankYouModal(true);
+    }
   };
 
   const closeAndClear = () => {
@@ -466,10 +304,10 @@ const POS = () => {
     setCart([]);
     setPaymentMethod("");
     setLastSale(null);
+    setSelectedCustomer(null);
   };
 
   const handleBarcodeScanned = (barcode: string) => {
-    // Buscar producto por código de barras
     const product = products.find(p => p.barcode === barcode);
     
     if (product) {
@@ -492,44 +330,39 @@ const POS = () => {
     setCustomerFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      const currentImages = customerFormData.images || [];
-      const remainingSlots = 10 - currentImages.length;
-      
-      if (remainingSlots === 0) {
-        toast({
-          title: "Límite alcanzado",
-          description: "Máximo 10 imágenes por cliente.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const filesToProcess = Array.from(files).slice(0, remainingSlots);
-      
-      filesToProcess.forEach(file => {
+  const handleProfileImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+     const file = e.target.files?.[0];
+     if (file) {
+        setProfileImageFile(file);
         const reader = new FileReader();
         reader.onloadend = () => {
-          setCustomerFormData(prev => ({
-            ...prev,
-            images: [...(prev.images || []), reader.result as string]
-          }));
+             setCustomerFormData(prev => ({ ...prev, image: reader.result as string }));
         };
         reader.readAsDataURL(file);
-      });
+     }
+  };
+
+  const handleGalleryImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+        const newFiles = Array.from(files);
+        setGalleryImageFiles(prev => [...prev, ...newFiles]);
+
+        // Preview logic
+        newFiles.forEach(file => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCustomerFormData(prev => ({
+                    ...prev,
+                    images: [...prev.images, reader.result as string]
+                }));
+            };
+            reader.readAsDataURL(file);
+        });
     }
   };
 
-  const handleRemoveImage = (index: number) => {
-    setCustomerFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleSaveCustomer = () => {
+  const handleCreateCustomer = async () => {
     if (!customerFormData.name || !customerFormData.phone) {
       toast({
         title: "Error",
@@ -539,81 +372,52 @@ const POS = () => {
       return;
     }
 
-    const newCustomer: Customer = {
-      id: Date.now(),
-      ...customerFormData,
-      visits: 0
-    };
+    setIsSubmittingCustomer(true);
+    try {
+        let profileImageUrl = "";
+        
+        // Upload profile image if exists
+        if (profileImageFile) {
+            profileImageUrl = await uploadImage(profileImageFile);
+        }
 
-    const updatedCustomers = [...customers, newCustomer];
-    setCustomers(updatedCustomers);
-    localStorage.setItem('customers', JSON.stringify(updatedCustomers));
-    
-    setSelectedCustomer(newCustomer);
-    setIsCustomerDialogOpen(false);
-    setCustomerFormData({
-      name: "",
-      email: "",
-      phone: "",
-      vehicle: "",
-      vehicleType: "",
-      licensePlate: "",
-      status: "Normal",
-      images: [],
-    });
+        // Upload gallery images
+        const galleryUrls: string[] = [];
+        for (const file of galleryImageFiles) {
+            const url = await uploadImage(file);
+            galleryUrls.push(url);
+        }
 
-    toast({
-      title: "Cliente creado",
-      description: "El cliente ha sido creado y seleccionado.",
-    });
-  };
+        await addCustomer({
+            name: customerFormData.name,
+            email: customerFormData.email,
+            phone: customerFormData.phone,
+            vehicle: customerFormData.vehicle,
+            vehicleType: customerFormData.vehicleType,
+            licensePlate: customerFormData.licensePlate,
+            status: customerFormData.status,
+            image: profileImageUrl,
+            images: galleryUrls
+        });
+        
+        setIsCustomerDialogOpen(false);
+        // Clean form
+        setCustomerFormData({
+            name: "", email: "", phone: "", vehicle: "", vehicleType: "", licensePlate: "", status: "Normal", image: "", images: []
+        });
+        setProfileImageFile(null);
+        setGalleryImageFiles([]);
 
-  // --- Order Handlers ---
-  const handleOrderInputChange = (field: string, value: any) => {
-    setOrderFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSaveOrder = () => {
-    if (!orderFormData.customerId || orderFormData.services.length === 0) {
-      toast({
-        title: "Error",
-        description: "Seleccione un cliente y al menos un servicio.",
-        variant: "destructive",
-      });
-      return;
+        // Auto select the new customer? 
+        // addCustomer doesn't return the ID easily without refactor, but we can search or just notify
+        // For now, let user search.
+    } catch (error) {
+        // handled in context
+    } finally {
+        setIsSubmittingCustomer(false);
     }
-
-    // Logic to save order would go here (e.g. save to localStorage or API)
-    // For now we just simulate success
-    toast({
-      title: "Pedido creado",
-      description: "El pedido ha sido creado exitosamente.",
-    });
-    setIsOrderDialogOpen(false);
   };
 
-  // --- Appointment Handlers ---
-  const handleAppointmentInputChange = (field: string, value: any) => {
-    setAppointmentFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSaveAppointment = () => {
-    if (!appointmentFormData.client || !appointmentFormData.date || !appointmentFormData.time) {
-      toast({
-        title: "Error",
-        description: "Complete los campos obligatorios.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Logic to save appointment
-    toast({
-      title: "Cita agendada",
-      description: "La cita ha sido agendada exitosamente.",
-    });
-    setIsAppointmentDialogOpen(false);
-  };
 
   const exportToPDF = () => {
     if (!lastSale) return;
@@ -752,14 +556,35 @@ const POS = () => {
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">POS - Punto de Venta</h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">Procesa ventas de servicios y productos</p>
           </div>
-          <Button 
-            onClick={() => setIsScannerOpen(true)} 
-            variant="outline"
-            className="gap-2"
-          >
-            <IoScanOutline className="h-5 w-5" />
-            Escanear Producto
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+                onClick={() => { refreshProducts(); refreshServices(); refreshCustomers(); }} 
+                variant="outline"
+                size="icon"
+                title="Recargar datos"
+            >
+                <IoReloadOutline className="h-5 w-5" />
+            </Button>
+            <Button 
+                onClick={() => setIsScannerOpen(true)} 
+                variant="outline"
+                className="gap-2"
+            >
+                <IoScanOutline className="h-5 w-5" />
+                Escanear Producto
+            </Button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative">
+            <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input 
+                className="pl-10 h-12 text-md bg-card shadow-sm"
+                placeholder="Buscar servicios o productos por nombre..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+            />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -772,7 +597,9 @@ const POS = () => {
               
               <TabsContent value="services" className="mt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {services.map((service) => (
+                  {services
+                    .filter(service => service.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((service) => (
                     <Card 
                       key={service.id} 
                       className="cursor-pointer hover:border-primary transition-all duration-200 hover:shadow-md active:scale-[0.98]"
@@ -788,13 +615,13 @@ const POS = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="flex items-center justify-between mt-2">
-                          <span className="text-2xl font-bold text-primary">${parseFloat(service.price).toFixed(2)}</span>
+                          <span className="text-2xl font-bold text-primary">${parseFloat(service.price.toString()).toFixed(2)}</span>
                           <Button size="sm" className="gap-1">
                             <IoAddOutline className="h-4 w-4" /> Agregar
                           </Button>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Bs. {calculateBsPrice(parseFloat(service.price))}
+                          Bs. {calculateBsPrice(parseFloat(service.price.toString()))}
                         </p>
                       </CardContent>
                     </Card>
@@ -803,37 +630,40 @@ const POS = () => {
               </TabsContent>
               
               <TabsContent value="products" className="mt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {products.map((product) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {products
+                    .filter(product => product.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((product) => (
                     <Card 
                       key={product.id} 
-                      className="cursor-pointer hover:border-primary transition-all duration-200 hover:shadow-md active:scale-[0.98]"
-                      onClick={() => addToCart("product", product)}
+                      className={`cursor-pointer transition-all duration-200 hover:shadow-md active:scale-[0.98] ${product.stock <= 0 ? 'opacity-60 grayscale' : 'hover:border-primary'}`}
+                      onClick={() => product.stock > 0 && addToCart("product", product)}
                     >
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <IoCubeOutline className="h-5 w-5 text-primary" />
-                            <CardTitle className="text-lg">{product.name}</CardTitle>
-                          </div>
-                          {product.barcode && (
-                            <Badge variant="outline" className="gap-1 text-xs font-mono">
-                              <IoBarcodeOutline className="h-3 w-3" />
-                              {formatBarcode(product.barcode)}
-                            </Badge>
-                          )}
+                      <div className="h-32 w-full bg-muted relative overflow-hidden">
+                        {product.image ? (
+                            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <IoCubeOutline className="h-10 w-10 text-muted-foreground/50" />
+                            </div>
+                        )}
+                        {product.stock <= 0 && (
+                            <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+                                <Badge variant="destructive">Agotado</Badge>
+                            </div>
+                        )}
+                      </div>
+                      <CardContent className="p-4">
+                        <h3 className="font-semibold truncate" title={product.name}>{product.name}</h3>
+                        <div className="flex justify-between items-end mt-2">
+                           <div>
+                                <div className="text-lg font-bold text-primary">${parseFloat(product.price).toFixed(2)}</div>
+                                <div className="text-xs text-muted-foreground">Stock: {product.stock}</div>
+                           </div>
+                           <Button size="sm" variant="ghost" disabled={product.stock <= 0}>
+                             <IoAddOutline className="h-5 w-5" />
+                           </Button>
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-2xl font-bold text-primary">${parseFloat(product.price).toFixed(2)}</span>
-                          <Button size="sm" className="gap-1">
-                            <IoAddOutline className="h-4 w-4" /> Agregar
-                          </Button>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Bs. {calculateBsPrice(parseFloat(product.price))}
-                        </p>
                       </CardContent>
                     </Card>
                   ))}
@@ -842,745 +672,431 @@ const POS = () => {
             </Tabs>
           </div>
 
-          <div className="lg:col-span-1">
-            <Card className="h-fit sticky top-6 shadow-lg border-t-4 border-t-primary">
-              <CardHeader className="pb-4 border-b">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <IoCartOutline className="h-6 w-6" />
-                  Carrito
+          <div className="space-y-6">
+            <Card className="border-2 border-primary/10 shadow-lg sticky top-6">
+              <CardHeader className="bg-muted/30 pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <IoCartOutline className="h-6 w-6 text-primary" />
+                  Resumen de Venta
                 </CardTitle>
+                
+                {/* Customer Selector */}
+                <div className="mt-4">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-bold mb-2 block">Cliente</Label>
+                    
+                    {!selectedCustomer ? (
+                        <div className="flex gap-2">
+                            <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" role="combobox" className="w-full justify-between">
+                                        Seleccionar cliente...
+                                        <IoSearch className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0">
+                                    <Command>
+                                        <CommandInput 
+                                            placeholder="Buscar por nombre, placa..." 
+                                            value={customerSearchQuery}
+                                            onValueChange={setCustomerSearchQuery}
+                                        />
+                                        <CommandEmpty>No se encontraron clientes.</CommandEmpty>
+                                        <CommandGroup>
+                                            {filteredCustomers.map((customer) => (
+                                                <HoverCard key={customer.id} openDelay={200}>
+                                                    <HoverCardTrigger asChild>
+                                                        <CommandItem
+                                                            onSelect={() => {
+                                                                setSelectedCustomer(customer);
+                                                                setCustomerSearchOpen(false);
+                                                            }}
+                                                            className="cursor-pointer"
+                                                        >
+                                                            <div className="flex flex-col w-full">
+                                                                <span>{customer.name}</span>
+                                                            </div>
+                                                            <IoCheckmarkOutline
+                                                                className={`ml-auto h-4 w-4 ${selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0"}`}
+                                                            />
+                                                        </CommandItem>
+                                                    </HoverCardTrigger>
+                                                    <HoverCardContent className="w-80" side="right" align="start">
+                                                        <div className="flex justify-between space-x-4">
+                                                            <Avatar>
+                                                                <AvatarImage src={customer.image} />
+                                                                <AvatarFallback>{customer.name.substring(0,2).toUpperCase()}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="space-y-1">
+                                                                <h4 className="text-sm font-semibold">{customer.name}</h4>
+                                                                <p className="text-sm text-muted-foreground">{customer.email}</p>
+                                                                <div className="flex items-center pt-2">
+                                                                    <IoPhonePortraitOutline className="mr-2 h-4 w-4 opacity-70" /> 
+                                                                    <span className="text-xs text-muted-foreground">{customer.phone}</span>
+                                                                </div>
+                                                                <div className="flex items-center">
+                                                                    <IoCarSportOutline className="mr-2 h-4 w-4 opacity-70" /> 
+                                                                    <span className="text-xs text-muted-foreground">{customer.vehicle} ({customer.licensePlate})</span>
+                                                                </div>
+                                                                <div className="mt-2 flex items-center gap-2">
+                                                                    <Badge variant={customer.status === 'VIP' ? 'default' : 'secondary'}>{customer.status}</Badge>
+                                                                    <span className="text-xs text-muted-foreground">Visitas: {customer.visits}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </HoverCardContent>
+                                                </HoverCard>
+                                            ))}
+                                        </CommandGroup>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                            <Button size="icon" onClick={() => setIsCustomerDialogOpen(true)}>
+                                <IoAddOutline className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="bg-primary/5 p-3 rounded-lg border border-primary/20 relative group">
+                             <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => setSelectedCustomer(null)}
+                             >
+                                <IoCloseOutline className="h-4 w-4" />
+                             </Button>
+                             <div className="font-medium text-primary flex items-center gap-2">
+                                <IoPersonCircleOutline className="h-5 w-5" />
+                                {selectedCustomer.name}
+                             </div>
+                             <div className="text-sm text-muted-foreground mt-1">
+                                {selectedCustomer.vehicle} • {selectedCustomer.licensePlate}
+                             </div>
+                             {selectedCustomer.status === 'VIP' && (
+                                <Badge className="mt-2 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-200">VIP Customer</Badge>
+                             )}
+                        </div>
+                    )}
+                </div>
               </CardHeader>
               <CardContent className="pt-6">
-                <div className="space-y-4 mb-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                   {cart.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-muted/30">
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
                       <IoCartOutline className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                      <p>El carrito está vacío</p>
-                      <p className="text-sm">Selecciona items para comenzar</p>
+                      <p>Carrito vacío</p>
                     </div>
                   ) : (
                     cart.map((item) => (
-                      <motion.div 
-                        key={item.id}
-                        layout
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
-                      >
+                      <div key={item.cartId} className="flex items-center justify-between p-3 bg-card border rounded-lg shadow-sm">
                         <div className="flex-1">
-                          <p className="font-medium text-sm">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            ${item.price.toFixed(2)} x {item.quantity}
-                          </p>
+                          <h4 className="font-medium text-sm">{item.name}</h4>
+                          <div className="text-xs text-muted-foreground">
+                            ${parseFloat(item.price.toString()).toFixed(2)} c/u
+                            {item.type === 'service' && <Badge variant="secondary" className="ml-2 text-[10px] py-0 h-4">Servicio</Badge>}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {item.type === 'product' && (
-                            <div className="flex items-center gap-1 bg-background rounded-md border px-1 h-8">
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, item.quantity - 1); }}
-                                className="w-6 h-full flex items-center justify-center hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
-                              >
-                                -
-                              </button>
-                              <span className="w-4 text-center text-sm font-medium">{item.quantity}</span>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, item.quantity + 1); }}
-                                className="w-6 h-full flex items-center justify-center hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
-                              >
-                                +
-                              </button>
-                            </div>
+                        <div className="flex items-center gap-3">
+                          {item.type === 'service' ? (
+                             <div className="h-8 w-8 flex items-center justify-center font-bold text-sm bg-muted rounded-md border">
+                                {item.quantity}
+                             </div>
+                          ) : (
+                              <div className="flex items-center gap-0.5 bg-primary rounded-md p-0.5 shadow-sm">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7 rounded-sm text-primary-foreground hover:bg-primary-foreground/20 hover:text-white transition-colors"
+                                  onClick={() => updateQuantity(item.cartId, item.quantity - 1)}
+                                >
+                                  -
+                                </Button>
+                                <span className="w-5 text-center text-sm font-bold text-primary-foreground">{item.quantity}</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7 rounded-sm text-primary-foreground hover:bg-primary-foreground/20 hover:text-white transition-colors"
+                                  onClick={() => updateQuantity(item.cartId, item.quantity + 1)}
+                                >
+                                  +
+                                </Button>
+                              </div>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
+                          <div className="text-right min-w-[60px]">
+                            <div className="font-bold text-sm">
+                              ${(item.price * item.quantity).toFixed(2)}
+                            </div>
+                          </div>
+                          <Button 
+                             variant="ghost" 
+                             size="icon"
+                             className="h-6 w-6 text-destructive hover:bg-destructive/10 -mr-2"
+                             onClick={() => removeFromCart(item.cartId)}
                           >
-                            <IoTrashOutline className="h-4 w-4" />
+                             <IoTrashOutline className="h-4 w-4" />
                           </Button>
                         </div>
-                      </motion.div>
+                      </div>
                     ))
                   )}
                 </div>
 
-                {/* Customer Selection Section */}
-                <div className="space-y-3 pb-4 border-b">
-                  <label className="text-sm font-medium">Cliente *:</label>
-                  <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
-                    <PopoverTrigger asChild>
-                      <div className="relative w-full">
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between h-10 pr-8"
-                      >
-                        {selectedCustomer ? (
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs font-medium">
-                                {selectedCustomer.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="text-left overflow-hidden">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium truncate">{selectedCustomer.name}</span>
-                                <Badge 
-                                  variant={selectedCustomer.status === 'VIP' ? 'default' : 'secondary'}
-                                  className="text-xs h-4 px-1.5"
-                                >
-                                  {selectedCustomer.status}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {selectedCustomer.phone} • {selectedCustomer.licensePlate || 'Sin placa'}
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="flex items-center gap-2">
-                            <IoPersonOutline className="h-4 w-4" />
-                            Seleccionar cliente
-                          </span>
-                        )}
-                      </Button>
-                      {selectedCustomer && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedCustomer(null);
-                          }}
-                        >
-                          <IoCloseOutline className="h-4 w-4" />
-                          <span className="sr-only">Quitar cliente</span>
-                        </Button>
-                      )}
+                <div className="mt-6 space-y-4">
+                  <div className="space-y-2 border-t pt-4">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span>${calculateSubtotal().toFixed(2)}</span>
                     </div>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[400px] p-0" align="start">
-                      <Command>
-                        <CommandInput 
-                          placeholder="Buscar por nombre, teléfono o placa..." 
-                          value={customerSearchQuery}
-                          onValueChange={setCustomerSearchQuery}
-                        />
-                        <CommandEmpty>No se encontraron clientes.</CommandEmpty>
-                        <CommandGroup className="max-h-[400px] overflow-y-auto">
-                          {filteredCustomers.map((customer) => (
-                            <CommandItem
-                              key={customer.id}
-                              value={`${customer.name} ${customer.phone} ${customer.licensePlate}`}
-                              onSelect={() => {
-                                setSelectedCustomer(customer);
-                                setCustomerSearchOpen(false);
-                                setCustomerSearchQuery('');
-                              }}
-                              className="group py-2 px-3 rounded-md transition-all duration-200 ease-in-out hover:bg-primary hover:shadow-sm cursor-pointer"
-                            >
-                              <div className="flex items-start gap-3 w-full">
-                                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-primary/80">
-                                  <span className="text-sm font-medium group-hover:text-white">
-                                    {customer.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                                  </span>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-medium truncate group-hover:text-white">{customer.name}</p>
-                                    <Badge 
-                                      variant={customer.status === 'VIP' ? 'default' : 'secondary'}
-                                      className="text-xs h-4 px-1.5 group-hover:bg-white/20 group-hover:text-white"
-                                    >
-                                      {customer.status}
-                                    </Badge>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5 group-hover:text-white/90">
-                                    {customer.phone && <span className="flex items-center"><IoPhonePortraitOutline className="mr-1 h-3 w-3 group-hover:text-white" /> {customer.phone}</span>}
-                                    {customer.licensePlate && <span className="flex items-center"><IoCarSportOutline className="mr-1 h-3 w-3 group-hover:text-white" /> {customer.licensePlate}</span>}
-                                    {customer.vehicle && <span className="truncate">{customer.vehicle}</span>}
-                                  </div>
-                                </div>
-                                {selectedCustomer?.id === customer.id && (
-                                  <IoCheckmarkOutline className="h-4 w-4 ml-2 flex-shrink-0" />
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-
-                  {/* Selected Customer Info */}
-                  {selectedCustomer && (
-                    <div className="p-3 bg-muted/50 rounded-lg space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{selectedCustomer.name}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedCustomer(null)}
-                          className="h-6 px-2 text-xs"
-                        >
-                          <IoCloseOutline className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Tel: {selectedCustomer.phone}
-                      </div>
-                      {selectedCustomer.vehicle && (
-                        <div className="text-xs text-muted-foreground">
-                          {selectedCustomer.vehicle} - {selectedCustomer.licensePlate}
-                        </div>
-                      )}
+                    <div className="flex justify-between items-end">
+                      <span className="font-bold text-lg">Total USD</span>
+                      <span className="font-bold text-2xl text-primary">${calculateSubtotal().toFixed(2)}</span>
                     </div>
-                  )}
-
-                  {/* Quick Action Buttons */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsCustomerDialogOpen(true)}
-                      className="text-xs h-9"
-                    >
-                      <IoPersonOutline className="h-4 w-4 mr-1" />
-                      Cliente
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsOrderDialogOpen(true)}
-                      className="text-xs h-9"
-                    >
-                      <IoCartOutline className="h-4 w-4 mr-1" />
-                      Pedido
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsAppointmentDialogOpen(true)}
-                      className="text-xs h-9"
-                    >
-                      <IoCalendarOutline className="h-4 w-4 mr-1" />
-                      Cita
-                    </Button>
+                    <div className="flex justify-between items-center bg-muted/50 p-2 rounded text-sm">
+                      <span className="text-muted-foreground">Tasa BCV: {dolarRate} Bs/$</span>
+                      <span className="font-medium">Bs. {calculateBsPrice(calculateSubtotal())}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-3 pt-4 border-t">
-                  <div className="flex justify-between items-end">
-                    <span className="text-lg font-semibold">Subtotal:</span>
-                    <span className="text-2xl font-bold text-primary">${calculateSubtotal().toFixed(2)}</span>
+                  <div className="space-y-3 pt-2">
+                    <Label>Método de Pago</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {["Efectivo", "Punto", "Pago Móvil", "Zelle"].map((method) => (
+                        <Button
+                          key={method}
+                          variant={paymentMethod === method ? "default" : "outline"}
+                          className={`justify-start ${paymentMethod === method ? "ring-2 ring-primary ring-offset-2" : ""}`}
+                          onClick={() => setPaymentMethod(method)}
+                        >
+                          {method === "Efectivo" && <IoCashOutline className="mr-2 h-4 w-4" />}
+                          {method === "Punto" && <IoCardOutline className="mr-2 h-4 w-4" />}
+                          {method === "Pago Móvil" && <IoPhonePortraitOutline className="mr-2 h-4 w-4" />}
+                          {method === "Zelle" && <span className="mr-2 font-bold text-xs">Z</span>}
+                          {method}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center text-muted-foreground">
-                    <span className="text-sm">En Bolívares:</span>
-                    <span className="font-medium">Bs. {calculateBsPrice(calculateSubtotal())}</span>
-                  </div>
-                </div>
 
-                <div className="mt-6 space-y-3">
-                  <label className="text-sm font-medium">Método de pago:</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button
-                      variant={paymentMethod === "Efectivo" ? "default" : "outline"}
-                      className={`h-20 flex flex-col gap-2 transition-all duration-200 ${paymentMethod === "Efectivo" ? "ring-2 ring-primary ring-offset-2" : "hover:border-primary/50"}`}
-                      onClick={() => setPaymentMethod("Efectivo")}
-                    >
-                      <IoCashOutline className="h-6 w-6" />
-                      <span className="text-xs">Efectivo</span>
-                    </Button>
-                    <Button
-                      variant={paymentMethod === "Tarjeta" ? "default" : "outline"}
-                      className={`h-20 flex flex-col gap-2 transition-all duration-200 ${paymentMethod === "Tarjeta" ? "ring-2 ring-primary ring-offset-2" : "hover:border-primary/50"}`}
-                      onClick={() => setPaymentMethod("Tarjeta")}
-                    >
-                      <IoCardOutline className="h-6 w-6" />
-                      <span className="text-xs">Tarjeta</span>
-                    </Button>
-                    <Button
-                      variant={paymentMethod === "Transferencia" ? "default" : "outline"}
-                      className={`h-20 flex flex-col gap-2 transition-all duration-200 ${paymentMethod === "Transferencia" ? "ring-2 ring-primary ring-offset-2" : "hover:border-primary/50"}`}
-                      onClick={() => setPaymentMethod("Transferencia")}
-                    >
-                      <IoPhonePortraitOutline className="h-6 w-6" />
-                      <span className="text-xs">Transf.</span>
-                    </Button>
-                  </div>
-                </div>
-
-                <motion.div
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full mt-4"
-                >
                   <Button 
-                    className="w-full h-12 text-lg font-semibold shadow-md" 
+                    className="w-full h-12 text-lg font-bold shadow-lg shadow-primary/20" 
                     size="lg"
                     onClick={processSale}
-                    disabled={cart.length === 0 || !paymentMethod || !selectedCustomer}
+                    disabled={cart.length === 0 || saleLoading}
                   >
-                    Procesar Venta
+                     {saleLoading ? (
+                         <>
+                            <IoReloadOutline className="mr-2 h-5 w-5 animate-spin" />
+                            Procesando...
+                         </>
+                     ) : (
+                         <>
+                            <IoCheckmarkCircleOutline className="mr-2 h-5 w-5" />
+                            Completar Venta
+                         </>
+                     )}
                   </Button>
-                </motion.div>
+                </div>
               </CardContent>
             </Card>
           </div>
         </div>
 
-        {/* Customer Creation Dialog */}
-        <Dialog open={isCustomerDialogOpen} onOpenChange={setIsCustomerDialogOpen}>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Crear Nuevo Cliente</DialogTitle>
-              <DialogDescription>
-                Ingrese los datos del nuevo cliente.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nombre *</Label>
-                  <Input
-                    id="name"
-                    value={customerFormData.name}
-                    onChange={(e) => handleCustomerInputChange("name", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono *</Label>
-                  <Input
-                    id="phone"
-                    value={customerFormData.phone}
-                    onChange={(e) => handleCustomerInputChange("phone", e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={customerFormData.email}
-                  onChange={(e) => handleCustomerInputChange("email", e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="vehicle">Vehículo</Label>
-                  <Input
-                    id="vehicle"
-                    placeholder="Ej. Toyota Corolla"
-                    value={customerFormData.vehicle}
-                    onChange={(e) => handleCustomerInputChange("vehicle", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="licensePlate">Placa</Label>
-                  <Input
-                    id="licensePlate"
-                    value={customerFormData.licensePlate}
-                    onChange={(e) => handleCustomerInputChange("licensePlate", e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="vehicleType">Tipo de Vehículo</Label>
-                  <Select
-                    value={customerFormData.vehicleType}
-                    onValueChange={(value) => handleCustomerInputChange("vehicleType", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Sedan">Sedan</SelectItem>
-                      <SelectItem value="SUV">SUV</SelectItem>
-                      <SelectItem value="Camioneta">Camioneta</SelectItem>
-                      <SelectItem value="Moto">Moto</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Estatus</Label>
-                  <Select
-                    value={customerFormData.status}
-                    onValueChange={(value) => handleCustomerInputChange("status", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Normal">Normal</SelectItem>
-                      <SelectItem value="Regular">Regular</SelectItem>
-                      <SelectItem value="VIP">VIP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              {/* Image Upload Section */}
-              <div className="space-y-2">
-                <Label>Fotos del vehículo ({customerFormData.images.length}/10)</Label>
-                <div className="grid grid-cols-5 gap-2 mt-2">
-                  {customerFormData.images.map((img, index) => (
-                    <div key={index} className="relative aspect-square group">
-                      <img
-                        src={img}
-                        alt={`Upload ${index + 1}`}
-                        className="w-full h-full object-cover rounded-md border"
-                      />
-                      <button
-                        onClick={() => handleRemoveImage(index)}
-                        className="absolute -top-1 -right-1 bg-destructive text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-label={`Eliminar imagen ${index + 1}`}
-                      >
-                        <IoCloseCircle className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                  {customerFormData.images.length < 10 && (
-                    <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed rounded-md cursor-pointer hover:bg-muted/50 transition-colors">
-                      <IoImagesOutline className="h-6 w-6 text-muted-foreground" />
-                      <span className="text-[10px] text-muted-foreground mt-1">Agregar</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={handleImageUpload}
-                      />
-                    </label>
-                  )}
-                </div>
-              </div>
+        {/* Create Customer Dialog */}
+        <Dialog open={isCustomerDialogOpen} onOpenChange={(open) => !open && setIsCustomerDialogOpen(false)}>
+          <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
+            <div className="px-4 py-3 border-b">
+                <DialogHeader className="flex flex-row items-center justify-between">
+                    <DialogTitle className="text-lg font-semibold">Nuevo Cliente</DialogTitle>
+                </DialogHeader>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCustomerDialogOpen(false)}>
-                Cancelar
+            
+            <div className="px-4 py-3 space-y-4">
+               {/* Profile Photo Section */}
+               <div className="flex items-center gap-4">
+                   <div className="h-14 w-14 rounded-full border-2 border-dashed flex items-center justify-center bg-muted/20 overflow-hidden relative shrink-0 cursor-pointer hover:bg-muted/30 transition-colors">
+                       {customerFormData.image ? (
+                           <img src={customerFormData.image} alt="Profile" className="h-full w-full object-cover" />
+                       ) : (
+                           <IoPeopleOutline className="h-6 w-6 text-muted-foreground/50" />
+                       )}
+                       <Input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleProfileImageUpload} 
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                       />
+                   </div>
+                   <div className="space-y-1">
+                        <Label className="font-medium text-xs block mb-1">Foto del perfil</Label>
+                        <Button variant="outline" size="sm" className="relative h-7 text-xs cursor-pointer">
+                           Subir foto
+                           <Input 
+                                type="file" 
+                                accept="image/*" 
+                                onChange={handleProfileImageUpload} 
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                           />
+                        </Button>
+                   </div>
+               </div>
+
+               {/* Form Fields Grid */}
+               <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                   <div className="space-y-1">
+                      <Label htmlFor="name" className="text-xs font-medium">Nombre</Label>
+                      <Input id="name" className="h-8 text-sm" placeholder="Ej: Juan Pérez" value={customerFormData.name} onChange={(e) => handleCustomerInputChange("name", e.target.value)} />
+                   </div>
+                   <div className="space-y-1">
+                      <Label htmlFor="email" className="text-xs font-medium">Email</Label>
+                      <Input id="email" className="h-8 text-sm" placeholder="ejemplo@email.com" value={customerFormData.email} onChange={(e) => handleCustomerInputChange("email", e.target.value)} />
+                   </div>
+
+                   <div className="space-y-1">
+                      <Label htmlFor="phone" className="text-xs font-medium">Teléfono</Label>
+                      <Input id="phone" className="h-8 text-sm" placeholder="Ej: 584123456789" value={customerFormData.phone} onChange={(e) => handleCustomerInputChange("phone", e.target.value)} />
+                   </div>
+                   <div className="space-y-1">
+                      <Label htmlFor="vehicle" className="text-xs font-medium">Vehículo</Label>
+                      <Input id="vehicle" className="h-8 text-sm" placeholder="Ej: Toyota Corolla" value={customerFormData.vehicle} onChange={(e) => handleCustomerInputChange("vehicle", e.target.value)} />
+                   </div>
+
+                   <div className="space-y-1">
+                      <Label htmlFor="type" className="text-xs font-medium">Tipo</Label>
+                      <Input id="type" className="h-8 text-sm" placeholder="Ej: Sedán" value={customerFormData.vehicleType} onChange={(e) => handleCustomerInputChange("vehicleType", e.target.value)} />
+                   </div>
+                   <div className="space-y-1">
+                      <Label htmlFor="plate" className="text-xs font-medium">Placa</Label>
+                      <Input id="plate" className="h-8 text-sm" placeholder="Ej: ABC123" value={customerFormData.licensePlate} onChange={(e) => handleCustomerInputChange("licensePlate", e.target.value.toUpperCase())} />
+                   </div>
+               </div>
+               
+               <div className="space-y-1 max-w-[50%]">
+                    <Label htmlFor="status" className="text-xs font-medium">Estado</Label>
+                    <Select 
+                        value={customerFormData.status} 
+                        onValueChange={(val: any) => handleCustomerInputChange("status", val)}
+                    >
+                        <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Normal">Normal</SelectItem>
+                            <SelectItem value="VIP">VIP</SelectItem>
+                            <SelectItem value="Regular">Regular</SelectItem>
+                        </SelectContent>
+                    </Select>
+               </div>
+
+               {/* Gallery Section */}
+               <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                      <Label className="font-medium text-xs">Galería (6-10)</Label>
+                      <Button variant="outline" size="sm" className="gap-2 relative h-7 text-xs px-3 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors cursor-pointer">
+                            <IoImageOutline className="h-3 w-3" />
+                            Agregar Fotos
+                            <Input 
+                                type="file" 
+                                multiple
+                                accept="image/*" 
+                                onChange={handleGalleryImageUpload} 
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                           />
+                      </Button>
+                  </div>
+                  
+                  <div className={`border border-dashed rounded-lg p-2 min-h-[60px] flex items-center justify-center ${customerFormData.images.length === 0 ? 'bg-muted/10' : 'bg-transparent'}`}>
+                     {customerFormData.images.length === 0 ? (
+                         <div className="text-center text-muted-foreground text-xs">
+                             Sin fotos
+                         </div>
+                     ) : (
+                         <div className="grid grid-cols-6 gap-2 w-full">
+                            {customerFormData.images.map((img, idx) => (
+                                <div key={idx} className="relative aspect-square rounded overflow-hidden border bg-background group">
+                                    <img src={img} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <IoCheckmarkCircleOutline className="h-4 w-4 text-white" />
+                                    </div>
+                                </div>
+                            ))}
+                         </div>
+                     )}
+                  </div>
+               </div>
+            </div>
+
+            <DialogFooter className="px-4 py-3 border-t flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setIsCustomerDialogOpen(false)}>Cancelar</Button>
+              <Button size="sm" onClick={handleCreateCustomer} disabled={isSubmittingCustomer} className="bg-primary hover:bg-primary/90">
+                 {isSubmittingCustomer ? '...' : 'Guardar'}
               </Button>
-              <Button onClick={handleSaveCustomer}>Guardar Cliente</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Order Creation Dialog */}
-        <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Crear Nuevo Pedido</DialogTitle>
-              <DialogDescription>
-                Cree un nuevo pedido o cita para un cliente.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Tipo de Pedido</Label>
-                <Tabs
-                  value={orderFormData.orderType}
-                  onValueChange={(value) => handleOrderInputChange("orderType", value)}
-                  className="w-full"
-                >
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="walk-in">Por Llegada</TabsTrigger>
-                    <TabsTrigger value="appointment">Cita Programada</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+        {/* Success / Thank You Modal */}
+        <Dialog open={showThankYouModal} onOpenChange={(open) => !open && closeAndClear()}>
+          <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0 shadow-2xl">
+            <div className="bg-primary pt-10 pb-20 px-6 text-center text-primary-foreground relative overlow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white to-transparent"></div>
+                <div className="mx-auto w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-6 shadow-inner ring-4 ring-white/10 relative z-10">
+                   <IoCheckmarkCircleOutline className="h-12 w-12 text-white" />
+                </div>
+                <h2 className="text-3xl font-bold relative z-10">¡Venta Exitosa!</h2>
+                <p className="text-primary-foreground/80 mt-2 relative z-10">La transacción se procesó correctamente.</p>
+            </div>
+            
+            <div className="px-6 -mt-12 relative z-20">
+                <div className="bg-card rounded-xl shadow-lg border p-6 text-center space-y-6">
+                    <div>
+                        <p className="text-muted-foreground text-sm uppercase tracking-wider font-semibold">Total Pagado</p>
+                        <div className="text-4xl font-extrabold text-primary mt-1">
+                            ${lastSale?.total.toFixed(2)}
+                        </div>
+                    </div>
 
-              <div className="space-y-2">
-                <Label>Cliente *</Label>
-                <Select
-                  value={orderFormData.customerId.toString()}
-                  onValueChange={(value) => handleOrderInputChange("customerId", parseInt(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id.toString()}>
-                        {customer.name} - {customer.licensePlate} ({customer.vehicle})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Servicios *</Label>
-                <Popover open={servicesPopoverOpen} onOpenChange={setServicesPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
-                      <IoAddOutline className="mr-2 h-4 w-4" />
-                      Seleccionar servicios
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0">
-                    <Command>
-                      <CommandInput placeholder="Buscar servicio..." />
-                      <CommandEmpty>No se encontraron servicios.</CommandEmpty>
-                      <CommandGroup>
-                        {services.map((service) => (
-                          <CommandItem
-                            key={service.id}
-                            onSelect={() => {
-                              const currentServices = orderFormData.services;
-                              const currentNames = orderFormData.serviceNames;
-                              if (!currentServices.includes(service.id)) {
-                                handleOrderInputChange("services", [...currentServices, service.id]);
-                                handleOrderInputChange("serviceNames", [...currentNames, service.name]);
-                              }
-                            }}
-                          >
-                            <div className="flex items-center justify-between w-full">
-                              <span>{service.name}</span>
-                              <span>${service.price}</span>
+                    {selectedCustomer && (
+                        <div className="bg-muted/30 rounded-lg p-4 border border-muted flex items-start gap-4 text-left">
+                            <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
+                                <AvatarImage src={selectedCustomer.image} />
+                                <AvatarFallback className="bg-primary/10 text-primary font-bold">{selectedCustomer.name.substring(0,2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-sm truncate">{selectedCustomer.name}</h4>
+                                <div className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                                    <IoCarSportOutline className="h-3 w-3" />
+                                    {selectedCustomer.vehicle} 
+                                    {selectedCustomer.licensePlate && <span className="font-mono bg-background px-1 rounded border ml-1">{selectedCustomer.licensePlate}</span>}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                                    <IoMailOutline className="h-3 w-3" />
+                                    {selectedCustomer.email || "Sin email"}
+                                </div>
                             </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                
-                {/* Selected Services Tags */}
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {orderFormData.services.map((serviceId) => {
-                    const service = services.find(s => s.id === serviceId);
-                    if (!service) return null;
-                    return (
-                      <Badge key={serviceId} variant="secondary" className="gap-1">
-                        {service.name}
-                        <button
-                          aria-label={`Eliminar ${service.name}`}
-                          onClick={() => {
-                            handleOrderInputChange("services", orderFormData.services.filter(id => id !== serviceId));
-                            handleOrderInputChange("serviceNames", orderFormData.serviceNames.filter(name => name !== service.name));
-                          }}
-                          className="ml-1 hover:bg-destructive/20 rounded-full"
-                        >
-                          <IoCloseOutline className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </div>
+                        </div>
+                    )}
 
-              {orderFormData.orderType === "appointment" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="orderDate">Fecha *</Label>
-                    <Input
-                      id="orderDate"
-                      type="date"
-                      value={orderFormData.date}
-                      onChange={(e) => handleOrderInputChange("date", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="orderTime">Hora *</Label>
-                    <Input
-                      id="orderTime"
-                      type="time"
-                      value={orderFormData.time}
-                      onChange={(e) => handleOrderInputChange("time", e.target.value)}
-                    />
-                  </div>
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div className="bg-muted/30 rounded p-2 border border-muted">
+                            <span className="block text-muted-foreground mb-1">ID Transacción</span>
+                            <span className="font-mono font-medium">{lastSale?.id}</span>
+                        </div>
+                        <div className="bg-muted/30 rounded p-2 border border-muted">
+                            <span className="block text-muted-foreground mb-1">Método de Pago</span>
+                            <span className="font-medium">{paymentMethod}</span>
+                        </div>
+                    </div>
                 </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="orderNotes">Notas</Label>
-                <Textarea
-                  id="orderNotes"
-                  value={orderFormData.notes}
-                  onChange={(e) => handleOrderInputChange("notes", e.target.value)}
-                />
-              </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsOrderDialogOpen(false)}>
-                Cancelar
+
+            <DialogFooter className="flex-col gap-3 p-6 pt-2">
+              <Button className="w-full h-12 text-base shadow-md font-bold" onClick={exportToPDF}>
+                <IoDownloadOutline className="mr-2 h-5 w-5" />
+                Descargar Recibo
               </Button>
-              <Button onClick={handleSaveOrder}>Crear Pedido</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Appointment Creation Dialog */}
-        <Dialog open={isAppointmentDialogOpen} onOpenChange={setIsAppointmentDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Agendar Nueva Cita</DialogTitle>
-              <DialogDescription>
-                Programe una nueva cita rápidamente.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="apptClient">Cliente *</Label>
-                <Input
-                  id="apptClient"
-                  placeholder="Nombre del cliente"
-                  value={appointmentFormData.client}
-                  onChange={(e) => handleAppointmentInputChange("client", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="apptService">Servicio *</Label>
-                <Input
-                  id="apptService"
-                  placeholder="Ej. Lavado Completo"
-                  value={appointmentFormData.service}
-                  onChange={(e) => handleAppointmentInputChange("service", e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="apptDate">Fecha *</Label>
-                  <Input
-                    id="apptDate"
-                    type="date"
-                    value={appointmentFormData.date}
-                    onChange={(e) => handleAppointmentInputChange("date", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apptTime">Hora *</Label>
-                  <Input
-                    id="apptTime"
-                    type="time"
-                    value={appointmentFormData.time}
-                    onChange={(e) => handleAppointmentInputChange("time", e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="apptPhone">Teléfono</Label>
-                <Input
-                  id="apptPhone"
-                  value={appointmentFormData.phone}
-                  onChange={(e) => handleAppointmentInputChange("phone", e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAppointmentDialogOpen(false)}>
-                Cancelar
+              <Button variant="ghost" className="w-full" onClick={closeAndClear}>
+                Nueva Venta
               </Button>
-              <Button onClick={handleSaveAppointment}>Agendar Cita</Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showThankYouModal} onOpenChange={closeAndClear}>
-          <DialogContent className="sm:max-w-md border-0 shadow-2xl">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="flex flex-col items-center text-center space-y-6 py-6"
-            >
-              <motion.div 
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 15 }}
-                className="flex justify-center"
-              >
-                <div className="rounded-full bg-green-100 p-3">
-                  <IoCheckmarkCircleOutline className="h-16 w-16 text-green-600" />
-                </div>
-              </motion.div>
-
-              <DialogHeader className="space-y-6">
-                <div className="space-y-2">
-                  <DialogTitle className="text-2xl font-bold text-center text-gray-900">
-                    ¡Gracias por su compra!
-                  </DialogTitle>
-                  <DialogDescription className="text-center text-gray-500">
-                    Su pedido ha sido procesado exitosamente.
-                  </DialogDescription>
-                </div>
-                
-                {selectedCustomer && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-3 rounded-lg border border-gray-200 shadow-sm hover:shadow transition-shadow duration-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-base font-semibold text-gray-800 flex items-center">
-                        <IoPersonCircleOutline className="mr-1.5 h-4 w-4 text-primary" />
-                        Cliente
-                      </h3>
-                      {selectedCustomer.status && (
-                        <Badge 
-                          variant={selectedCustomer.status === 'VIP' ? 'default' : 'secondary'}
-                          className="px-2 py-1 text-xs font-medium"
-                        >
-                          {selectedCustomer.status}
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-1 text-sm">
-                      <p className="text-gray-900">{selectedCustomer.name}</p>
-                      {selectedCustomer.phone && (
-                        <p className="text-gray-600">{selectedCustomer.phone}</p>
-                      )}
-                      {(selectedCustomer.vehicle || selectedCustomer.licensePlate) && (
-                        <p className="text-gray-700">
-                          {selectedCustomer.vehicle} 
-                          {selectedCustomer.licensePlate && `(${selectedCustomer.licensePlate})`}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </DialogHeader>
-
-              {lastSale && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="w-full bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-3"
-                >
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">ID de Pedido</span>
-                    <span className="font-mono font-medium text-gray-900">{lastSale.id}</span>
-                  </div>
-                  <div className="h-px bg-gray-200 w-full"></div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-700">Total Pagado</span>
-                    <div className="text-right">
-                      <div className="font-bold text-xl text-primary">${lastSale.total.toFixed(2)}</div>
-                      <div className="text-xs text-gray-500">Bs. {calculateBsPrice(lastSale.total)}</div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              <DialogFooter className="flex flex-col sm:flex-row gap-3 w-full sm:justify-center mt-4">
-                <Button
-                  onClick={exportToPDF}
-                  className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm"
-                >
-                  <IoDownloadOutline className="h-5 w-5" />
-                  Descargar Recibo
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={closeAndClear}
-                  className="flex-1 border-gray-200 hover:bg-gray-50 hover:text-gray-900"
-                >
-                  Cerrar
-                </Button>
-              </DialogFooter>
-            </motion.div>
           </DialogContent>
         </Dialog>
 
@@ -1588,7 +1104,7 @@ const POS = () => {
           isOpen={isScannerOpen}
           onClose={() => setIsScannerOpen(false)}
           onScan={handleBarcodeScanned}
-          title="Escanear Producto para Agregar al Carrito"
+          title="Escanear Producto"
         />
       </motion.div>
     </div>

@@ -19,9 +19,11 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import BarcodeTestPanel from "./pages/BarcodeTestPanel";
 import { ProductProvider } from "./contexts/ProductContext";
+import { SalesProvider } from "./contexts/SalesContext";
 import { MovementProvider } from "./contexts/MovementContext";
 import { CustomerProvider } from "./contexts/CustomerContext";
 import { ServiceProvider } from "@/contexts/ServiceContext";
+import { OrderProvider } from "./contexts/OrderContext";
 
 const queryClient = new QueryClient();
 
@@ -50,35 +52,39 @@ const App = () => {
         <MovementProvider>
           <CustomerProvider>
             <ServiceProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
-                  <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/" element={<Navigate to="/login" replace />} />
-                    <Route element={<MainLayout />}>
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/pos" element={<POS />} />
-                      <Route path="/services" element={<Services />} />
-                      <Route path="/inventory" element={<Inventory />} />
-                      <Route path="/movements" element={<Movements />} />
-                      <Route path="/appointments" element={<Orders />} />
-                      <Route path="/customers" element={<Customers />} />
-                      <Route path="/settings" element={<Settings />} />
-                      {import.meta.env.DEV && (
-                        <Route path="/barcode-test" element={<BarcodeTestPanel />} />
-                      )}
-                    </Route>
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </BrowserRouter>
-              </TooltipProvider>
+              <SalesProvider>
+                <OrderProvider>
+                  <TooltipProvider>
+                    <Toaster />
+                    <Sonner />
+                    <BrowserRouter>
+                      <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/" element={<Navigate to="/login" replace />} />
+                        <Route element={<MainLayout />}>
+                          <Route path="/dashboard" element={<Dashboard />} />
+                          <Route path="/pos" element={<POS />} />
+                          <Route path="/services" element={<Services />} />
+                          <Route path="/inventory" element={<Inventory />} />
+                          <Route path="/movements" element={<Movements />} />
+                          <Route path="/appointments" element={<Orders />} />
+                          <Route path="/customers" element={<Customers />} />
+                          <Route path="/settings" element={<Settings />} />
+                          {import.meta.env.DEV && (
+                            <Route path="/barcode-test" element={<BarcodeTestPanel />} />
+                          )}
+                        </Route>
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </BrowserRouter>
+                  </TooltipProvider>
+                </OrderProvider>
+              </SalesProvider>
             </ServiceProvider>
           </CustomerProvider>
         </MovementProvider>
       </ProductProvider>
     </QueryClientProvider>
-);
+  );
 }
 export default App;

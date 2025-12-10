@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useToast } from "@/components/ui/use-toast";
 
 export interface Movement {
   id: number;
@@ -11,7 +13,7 @@ export interface Movement {
 }
 
 interface CartItem {
-  id: string;
+  id: string; // Cart ID
   type: "service" | "product";
   itemId: number;
   name: string;
@@ -21,74 +23,152 @@ interface CartItem {
 
 interface MovementContextType {
   movements: Movement[];
-  addMovement: (movement: Omit<Movement, 'id' | 'date'>) => void;
-  registerSaleMovements: (saleId: string, cartItems: CartItem[]) => void;
+  loading: boolean;
+  addMovement: (movement: Omit<Movement, 'id' | 'date'>) => Promise<boolean>;
+  registerSaleMovements: (saleId: string, cartItems: CartItem[]) => Promise<void>;
+  refreshMovements: () => Promise<void>;
 }
 
 const MovementContext = createContext<MovementContextType | undefined>(undefined);
 
-const initialMovements: Movement[] = [
-  {
-    id: 1,
-    type: "entry",
-    productId: 1,
-    productName: "Cera Premium",
-    quantity: 50,
-    date: "2024-12-01",
-    reason: "Compra inicial de inventario",
-  },
-  {
-    id: 2,
-    type: "exit",
-    productId: 2,
-    productName: "Shampoo Automotriz",
-    quantity: 10,
-    date: "2024-12-01",
-    reason: "Venta a cliente mayorista",
-  },
-];
-
 export const MovementProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [movements, setMovements] = useState<Movement[]>(() => {
-    const stored = localStorage.getItem('movements');
-    return stored ? JSON.parse(stored) : initialMovements;
-  });
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    localStorage.setItem('movements', JSON.stringify(movements));
-  }, [movements]);
+  const fetchMovements = async () => {
+    try {
+      setLoading(true);
+      // Join con la tabla productos para obtener el nombre
+      const { data, error } = await supabase
+        .from('movimientos')
+        .select(`
+          *,
+          productos (
+            nombre
+          )
+        `)
+        .order('fecha', { ascending: false });
 
-  const addMovement = (movement: Omit<Movement, 'id' | 'date'>) => {
-    const newMovement: Movement = {
-      ...movement,
-      id: Date.now(),
-      date: new Date().toISOString().split('T')[0],
-    };
-    setMovements(prev => [newMovement, ...prev]);
+      if (error) throw error;
+
+      if (data) {
+        const mappedMovements: Movement[] = data.map((item: any) => ({
+           id: item.id,
+           type: item.tipo === 'entrada' ? 'entry' : 'exit',
+           productId: item.producto_id,
+           productName: item.productos?.nombre || 'Producto desconocido',
+           quantity: item.cantidad,
+           date: item.fecha,
+           reason: item.motivo
+        }));
+        setMovements(mappedMovements);
+      }
+    } catch (error) {
+      console.error('Error fetching movements:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los movimientos.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const registerSaleMovements = (saleId: string, cartItems: CartItem[]) => {
+  useEffect(() => {
+    fetchMovements();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel('movements_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'movimientos',
+        },
+        () => {
+          // Refresh list when a new movement is inserted
+          fetchMovements();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const refreshMovements = async () => {
+      await fetchMovements();
+  };
+
+  const addMovement = async (movement: Omit<Movement, 'id' | 'date'>): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('movimientos')
+        .insert([{
+            tipo: movement.type === 'entry' ? 'entrada' : 'salida',
+            producto_id: movement.productId,
+            cantidad: movement.quantity,
+            motivo: movement.reason,
+            fecha: new Date().toISOString()
+        }]);
+
+      if (error) throw error;
+      
+      await fetchMovements();
+      return true;
+    } catch (error) {
+      console.error('Error adding movement:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo registrar el movimiento.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const registerSaleMovements = async (saleId: string, cartItems: CartItem[]) => {
     const productItems = cartItems.filter(item => item.type === "product");
     
-    const newMovements = productItems.map(item => ({
-      id: Date.now() + Math.random(), // Ensure unique IDs
-      type: "exit" as const,
-      productId: item.itemId,
-      productName: item.name,
-      quantity: item.quantity,
-      date: new Date().toISOString().split('T')[0],
-      reason: `Venta ${saleId}`,
-    }));
+    if (productItems.length === 0) return;
 
-    setMovements(prev => [...newMovements, ...prev]);
+    try {
+        const movementsToInsert = productItems.map(item => ({
+            tipo: 'salida',
+            producto_id: item.itemId,
+            cantidad: item.quantity,
+            motivo: `Venta #${saleId}`,
+            fecha: new Date().toISOString()
+        }));
+
+        const { error } = await supabase
+            .from('movimientos')
+            .insert(movementsToInsert);
+
+        if (error) throw error;
+        
+        // Background refresh, don't await to not block UI if not needed
+        refreshMovements();
+    } catch (error) {
+        console.error("Error registering sale movements", error);
+        // We log error but maybe don't block the sale flow?
+        // Ideally this should be server-side trigger but we do it client side as per request.
+    }
   };
 
   return (
     <MovementContext.Provider
       value={{
         movements,
+        loading,
         addMovement,
         registerSaleMovements,
+        refreshMovements
       }}
     >
       {children}

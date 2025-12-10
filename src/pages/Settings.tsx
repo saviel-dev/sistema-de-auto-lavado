@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -38,23 +38,118 @@ import {
 } from "react-icons/io5";
 import { useToast } from "@/components/ui/use-toast";
 import { Toaster } from "@/components/ui/toaster";
+import { supabase } from "@/lib/supabase";
+
+interface AppConfig {
+  id?: number;
+  nombre_negocio: string;
+  rif: string;
+  telefono: string;
+  email: string;
+  direccion: string;
+  instagram: string;
+  facebook: string;
+  whatsapp: string;
+  hora_apertura: string;
+  hora_cierre: string;
+  dias_laborables: string[];
+}
 
 const Settings = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showLogoutSuccess, setShowLogoutSuccess] = useState(false);
 
-  const handleSave = () => {
+  const [config, setConfig] = useState<AppConfig>({
+    nombre_negocio: '',
+    rif: '',
+    telefono: '',
+    email: '',
+    direccion: '',
+    instagram: '',
+    facebook: '',
+    whatsapp: '',
+    hora_apertura: '08:00',
+    hora_cierre: '18:00',
+    dias_laborables: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  });
+
+  const fetchConfig = async () => {
+    try {
+      setFetching(true);
+      const { data, error } = await supabase
+        .from('configuracion')
+        .select('*')
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "Relation not found" or "Row not found"
+        throw error;
+      }
+
+      if (data) {
+        setConfig(data);
+      }
+    } catch (error) {
+      console.error('Error fetching config:', error);
+      toast({
+        title: "Nota",
+        description: "No se pudo cargar la configuración. Asegúrate de haber ejecutado el script SQL.",
+        variant: "destructive",
+      });
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConfig();
+  }, []);
+
+  const handleChange = (field: keyof AppConfig, value: any) => {
+    setConfig(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleWorkDayToggle = (day: string) => {
+    setConfig(prev => {
+      const exists = prev.dias_laborables.includes(day);
+      if (exists) {
+        return { ...prev, dias_laborables: prev.dias_laborables.filter(d => d !== day) };
+      } else {
+        return { ...prev, dias_laborables: [...prev.dias_laborables, day] };
+      }
+    });
+  };
+
+  const handleSave = async () => {
     setLoading(true);
-    // Simular guardado
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Upsert logic: if id=1 exists update, else insert
+      const { error } = await supabase
+        .from('configuracion')
+        .upsert({
+          id: 1, // Force ID 1 for singleton config
+          ...config,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
       toast({
         title: "Configuración guardada",
         description: "Los cambios han sido aplicados correctamente.",
       });
-    }, 1000);
+    } catch (error) {
+      console.error('Error saving config:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar los cambios.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogoutClick = () => {
@@ -82,6 +177,10 @@ const Settings = () => {
     hidden: { opacity: 0, y: 10 },
     visible: { opacity: 1, y: 0 }
   };
+
+  if (fetching) {
+     return <div className="p-8 text-center">Cargando configuración...</div>;
+  }
 
   return (
     <motion.div 
@@ -198,25 +297,56 @@ const Settings = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="business-name">Nombre del Negocio</Label>
-                  <Input id="business-name" defaultValue="Autolavado Gochi" placeholder="Ej. Autolavado Gochi" className="bg-background/50" />
+                  <Input 
+                    id="business-name" 
+                    value={config.nombre_negocio} 
+                    onChange={(e) => handleChange('nombre_negocio', e.target.value)}
+                    placeholder="Ej. Autolavado Gochi" 
+                    className="bg-background/50" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="business-rif">RIF / Identificación</Label>
-                  <Input id="business-rif" defaultValue="J-12345678-9" placeholder="Ej. J-12345678-9" className="bg-background/50" />
+                  <Input 
+                    id="business-rif" 
+                    value={config.rif} 
+                    onChange={(e) => handleChange('rif', e.target.value)}
+                    placeholder="Ej. J-12345678-9" 
+                    className="bg-background/50" 
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="business-phone">Teléfono</Label>
-                    <Input id="business-phone" defaultValue="0412-1234567" placeholder="Ej. 0412-1234567" className="bg-background/50" />
+                    <Input 
+                      id="business-phone" 
+                      value={config.telefono} 
+                      onChange={(e) => handleChange('telefono', e.target.value)}
+                      placeholder="Ej. 0412-1234567" 
+                      className="bg-background/50" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="business-email">Email</Label>
-                    <Input id="business-email" type="email" defaultValue="contacto@gochi.com" placeholder="Ej. contacto@gochi.com" className="bg-background/50" />
+                    <Input 
+                      id="business-email" 
+                      type="email" 
+                      value={config.email} 
+                      onChange={(e) => handleChange('email', e.target.value)}
+                      placeholder="Ej. contacto@gochi.com" 
+                      className="bg-background/50" 
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="business-address">Dirección Física</Label>
-                  <Input id="business-address" defaultValue="Av. Principal, Local 123, Ciudad" placeholder="Ej. Av. Principal, Local 123" className="bg-background/50" />
+                  <Input 
+                    id="business-address" 
+                    value={config.direccion} 
+                    onChange={(e) => handleChange('direccion', e.target.value)}
+                    placeholder="Ej. Av. Principal, Local 123" 
+                    className="bg-background/50" 
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -236,19 +366,37 @@ const Settings = () => {
                   <Label htmlFor="instagram" className="flex items-center gap-2 text-pink-600 font-medium">
                     <IoLogoInstagram className="h-5 w-5" /> Instagram
                   </Label>
-                  <Input id="instagram" placeholder="@usuario" defaultValue="@autolavadogochi" className="bg-background/50 border-pink-100 focus:border-pink-300 focus:ring-pink-200" />
+                  <Input 
+                    id="instagram" 
+                    value={config.instagram} 
+                    onChange={(e) => handleChange('instagram', e.target.value)}
+                    placeholder="@usuario" 
+                    className="bg-background/50 border-pink-100 focus:border-pink-300 focus:ring-pink-200" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="facebook" className="flex items-center gap-2 text-blue-600 font-medium">
                     <IoLogoFacebook className="h-5 w-5" /> Facebook
                   </Label>
-                  <Input id="facebook" placeholder="/pagina" defaultValue="/autolavadogochi" className="bg-background/50 border-blue-100 focus:border-blue-300 focus:ring-blue-200" />
+                  <Input 
+                    id="facebook" 
+                    value={config.facebook} 
+                    onChange={(e) => handleChange('facebook', e.target.value)}
+                    placeholder="/pagina" 
+                    className="bg-background/50 border-blue-100 focus:border-blue-300 focus:ring-blue-200"  
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="whatsapp" className="flex items-center gap-2 text-green-600 font-medium">
                     <IoLogoWhatsapp className="h-5 w-5" /> WhatsApp Business
                   </Label>
-                  <Input id="whatsapp" placeholder="58..." defaultValue="584121234567" className="bg-background/50 border-green-100 focus:border-green-300 focus:ring-green-200" />
+                  <Input 
+                    id="whatsapp" 
+                    value={config.whatsapp} 
+                    onChange={(e) => handleChange('whatsapp', e.target.value)}
+                    placeholder="58..." 
+                    className="bg-background/50 border-green-100 focus:border-green-300 focus:ring-green-200" 
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -276,7 +424,8 @@ const Settings = () => {
                       <Input 
                         id="opening-time" 
                         type="time" 
-                        defaultValue="08:00" 
+                        value={config.hora_apertura}
+                        onChange={(e) => handleChange('hora_apertura', e.target.value)}
                         className="text-lg p-6 bg-background/50 text-center font-mono"
                       />
                     </div>
@@ -287,7 +436,8 @@ const Settings = () => {
                       <Input 
                         id="closing-time" 
                         type="time" 
-                        defaultValue="18:00" 
+                        value={config.hora_cierre}
+                        onChange={(e) => handleChange('hora_cierre', e.target.value)}
                         className="text-lg p-6 bg-background/50 text-center font-mono"
                       />
                     </div>
@@ -297,22 +447,26 @@ const Settings = () => {
                 <div className="space-y-3 pt-4 border-t">
                   <Label className="text-base">Días Laborables</Label>
                   <div className="flex flex-wrap gap-3">
-                    {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => (
-                      <motion.div
-                        key={day}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <Button 
-                          variant={day === 'Dom' ? "outline" : "default"} 
-                          className={`rounded-full w-12 h-12 p-0 font-medium ${
-                            day !== 'Dom' ? 'bg-primary shadow-md shadow-primary/30' : 'border-dashed'
-                          }`}
+                    {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => {
+                      const isActive = config.dias_laborables.includes(day);
+                      return (
+                        <motion.div
+                          key={day}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
                         >
-                          {day}
-                        </Button>
-                      </motion.div>
-                    ))}
+                          <Button 
+                            variant={isActive ? "default" : "outline"}
+                            onClick={() => handleWorkDayToggle(day)}
+                            className={`rounded-full w-12 h-12 p-0 font-medium ${
+                              isActive ? 'bg-primary shadow-md shadow-primary/30' : 'border-dashed'
+                            }`}
+                          >
+                            {day}
+                          </Button>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">
                     * Los días marcados en azul son laborables
