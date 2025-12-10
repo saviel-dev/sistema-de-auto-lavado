@@ -64,8 +64,23 @@ const menuItems = [
   },
 ];
 
+import { useAuth } from "@/contexts/AuthContext";
+
+// ... (keep imports)
+
+// ... (keep menuItems definition)
+
 export function AppSidebar() {
   const location = useLocation();
+  const { isAdmin } = useAuth();
+
+  const filteredMenuItems = menuItems.filter(item => {
+    // Hide Settings for non-admins
+    if (item.title === "Configuración" && !isAdmin) {
+        return false;
+    }
+    return true;
+  });
 
   return (
     <Sidebar className="border-r border-sidebar-border">
@@ -78,7 +93,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
+              {filteredMenuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.url;
                 return (

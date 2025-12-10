@@ -76,6 +76,67 @@ const Settings = () => {
     dias_laborables: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
   });
 
+  const [passwordData, setPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  // ... fetchConfig ...
+
+  const handlePasswordUpdate = async () => {
+    if (!passwordData.newPassword || !passwordData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Por favor complete todos los campos de contraseña.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Las contraseñas no coinciden.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+        toast({
+          title: "Error",
+          description: "La contraseña debe tener al menos 6 caracteres.",
+          variant: "destructive",
+        });
+        return;
+    }
+
+    setUpdatingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "¡Éxito!",
+        description: "Tu contraseña ha sido actualizada correctamente.",
+      });
+      setPasswordData({ newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      console.error('Error updating password:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la contraseña. Intenta nuevamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingPassword(false);
+    }
+  };
+
   const fetchConfig = async () => {
     try {
       setFetching(true);
@@ -89,7 +150,10 @@ const Settings = () => {
       }
 
       if (data) {
-        setConfig(data);
+        setConfig({
+          ...data,
+          dias_laborables: data.dias_laborables || []
+        });
       }
     } catch (error) {
       console.error('Error fetching config:', error);
@@ -156,12 +220,20 @@ const Settings = () => {
     setShowLogoutConfirm(true);
   };
 
-  const handleLogoutConfirm = () => {
+  const handleLogoutConfirm = async () => {
     setShowLogoutConfirm(false);
-    // Simular proceso de cierre de sesión
-    setTimeout(() => {
+    try {
+      await supabase.auth.signOut();
       setShowLogoutSuccess(true);
-    }, 500);
+      // Optional: Redirect to login or handled by App auth state listener
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: "Error",
+        description: "Error al cerrar sesión.",
+        variant: "destructive",
+      });
+    }
   };
 
   const containerVariants = {
@@ -448,7 +520,7 @@ const Settings = () => {
                   <Label className="text-base">Días Laborables</Label>
                   <div className="flex flex-wrap gap-3">
                     {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => {
-                      const isActive = config.dias_laborables.includes(day);
+                      const isActive = config.dias_laborables?.includes(day);
                       return (
                         <motion.div
                           key={day}
@@ -493,17 +565,34 @@ const Settings = () => {
               <CardContent className="space-y-6">
                 <div className="max-w-md space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="current-password">Contraseña Actual</Label>
-                    <Input id="current-password" type="password" placeholder="Ingresa tu contraseña actual" className="bg-background/50" />
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="new-password">Nueva Contraseña</Label>
-                    <Input id="new-password" type="password" placeholder="Ingresa la nueva contraseña" className="bg-background/50" />
+                    <Input 
+                      id="new-password" 
+                      type="password" 
+                      placeholder="Ingresa la nueva contraseña" 
+                      className="bg-background/50"
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
-                    <Input id="confirm-password" type="password" placeholder="Repite la nueva contraseña" className="bg-background/50" />
+                    <Input 
+                      id="confirm-password" 
+                      type="password" 
+                      placeholder="Repite la nueva contraseña" 
+                      className="bg-background/50"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    />
                   </div>
+                  <Button 
+                    onClick={handlePasswordUpdate}
+                    disabled={updatingPassword || !passwordData.newPassword}
+                    className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md shadow-red-500/20"
+                  >
+                    {updatingPassword ? "Actualizando..." : "Actualizar Contraseña"}
+                  </Button>
                 </div>
                 
                 <div className="pt-6 border-t flex flex-col md:flex-row gap-4 justify-between items-center">

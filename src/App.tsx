@@ -24,6 +24,7 @@ import { MovementProvider } from "./contexts/MovementContext";
 import { CustomerProvider } from "./contexts/CustomerContext";
 import { ServiceProvider } from "@/contexts/ServiceContext";
 import { OrderProvider } from "./contexts/OrderContext";
+import { AuthProvider } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
@@ -48,42 +49,44 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ProductProvider>
-        <MovementProvider>
-          <CustomerProvider>
-            <ServiceProvider>
-              <SalesProvider>
-                <OrderProvider>
-                  <TooltipProvider>
-                    <Toaster />
-                    <Sonner />
-                    <BrowserRouter>
-                      <Routes>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/" element={<Navigate to="/login" replace />} />
-                        <Route element={<MainLayout />}>
-                          <Route path="/dashboard" element={<Dashboard />} />
-                          <Route path="/pos" element={<POS />} />
-                          <Route path="/services" element={<Services />} />
-                          <Route path="/inventory" element={<Inventory />} />
-                          <Route path="/movements" element={<Movements />} />
-                          <Route path="/appointments" element={<Orders />} />
-                          <Route path="/customers" element={<Customers />} />
-                          <Route path="/settings" element={<Settings />} />
-                          {import.meta.env.DEV && (
-                            <Route path="/barcode-test" element={<BarcodeTestPanel />} />
-                          )}
-                        </Route>
-                        <Route path="*" element={<NotFound />} />
-                      </Routes>
-                    </BrowserRouter>
-                  </TooltipProvider>
-                </OrderProvider>
-              </SalesProvider>
-            </ServiceProvider>
-          </CustomerProvider>
-        </MovementProvider>
-      </ProductProvider>
+      <AuthProvider>
+        <ProductProvider>
+          <MovementProvider>
+            <CustomerProvider>
+              <ServiceProvider>
+                <SalesProvider>
+                  <OrderProvider>
+                    <TooltipProvider>
+                      <Toaster />
+                      <Sonner />
+                      <BrowserRouter>
+                        <Routes>
+                          <Route path="/login" element={<Login />} />
+                          <Route path="/" element={<Navigate to="/login" replace />} />
+                          <Route element={<MainLayout />}>
+                            <Route path="/dashboard" element={<Dashboard />} />
+                            <Route path="/pos" element={<POS />} />
+                            <Route path="/services" element={<Services />} />
+                            <Route path="/inventory" element={<Inventory />} />
+                            <Route path="/movements" element={<Movements />} />
+                            <Route path="/appointments" element={<Orders />} />
+                            <Route path="/customers" element={<Customers />} />
+                            <Route path="/settings" element={<Settings />} />
+                            {import.meta.env.DEV && (
+                              <Route path="/barcode-test" element={<BarcodeTestPanel />} />
+                            )}
+                          </Route>
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </BrowserRouter>
+                    </TooltipProvider>
+                  </OrderProvider>
+                </SalesProvider>
+              </ServiceProvider>
+            </CustomerProvider>
+          </MovementProvider>
+        </ProductProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

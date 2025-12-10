@@ -3,17 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { IoCarSportOutline, IoEyeOutline, IoEyeOffOutline } from "react-icons/io5";
 
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+
 const Login = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [usernameError, setUsernameError] = useState(false);
+  const [emailError, setEmailError] = useState(false);
   const [particles, setParticles] = useState<Array<{ id: number; left: number; delay: number; duration: number; size: number; opacity: number }>>([]);
 
-  // Generate particles on mount
+  // Generate particles on mount & Load saved email
   useEffect(() => {
     const particleCount = 50;
     const newParticles = Array.from({ length: particleCount }, (_, i) => ({
@@ -22,26 +25,50 @@ const Login = () => {
       delay: Math.random() * 5,
       duration: Math.random() * 3 + 3,
       size: Math.random() * 4 + 2,
-   opacity: Math.random() * 0.5 + 0.1,
+      opacity: Math.random() * 0.5 + 0.1,
     }));
     setParticles(newParticles);
+
+    const savedEmail = localStorage.getItem('remember_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (username.trim() === "") {
-      setUsernameError(true);
+    if (email.trim() === "") {
+      setEmailError(true);
       return;
     }
     
-    setUsernameError(false);
+    setEmailError(false);
     setIsLoading(true);
     
-    // Simulate login process
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+
+      if (error) throw error;
+
+      if (rememberMe) {
+        localStorage.setItem('remember_email', email);
+      } else {
+        localStorage.removeItem('remember_email');
+      }
+
+      toast.success("Bienvenido de nuevo");
       navigate("/dashboard");
-    }, 2000);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message === "Invalid login credentials" ? "Credenciales inválidas" : "Error al iniciar sesión");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -129,7 +156,7 @@ const Login = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-          {/* Username Input */}
+          {/* Email Input */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -137,26 +164,26 @@ const Login = () => {
             className="relative"
           >
             <input
-              type="text"
-              id="username"
+              type="email"
+              id="email"
               placeholder=" "
-              value={username}
+              value={email}
               onChange={(e) => {
-                setUsername(e.target.value);
-                setUsernameError(false);
+                setEmail(e.target.value);
+                setEmailError(false);
               }}
               className={`peer w-full px-4 py-3 border ${
-                usernameError ? "border-red-500" : "border-gray-300"
+                emailError ? "border-red-500" : "border-gray-300"
               } rounded-md focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all bg-white/50 text-gray-900 placeholder-transparent`}
             />
             <label
-              htmlFor="username"
+              htmlFor="email"
               className="absolute left-4 top-3 text-gray-500 text-base transition-all duration-200 pointer-events-none peer-focus:top-[-0.5rem] peer-focus:left-2 peer-focus:text-xs peer-focus:text-indigo-600 peer-focus:bg-white peer-focus:px-1 peer-[:not(:placeholder-shown)]:top-[-0.5rem] peer-[:not(:placeholder-shown)]:left-2 peer-[:not(:placeholder-shown)]:text-xs peer-[:not(:placeholder-shown)]:bg-white peer-[:not(:placeholder-shown)]:px-1 peer-[:not(:placeholder-shown)]:text-gray-500"
             >
-              Usuario
+              Correo Electrónico
             </label>
-            {usernameError && (
-              <p className="text-red-500 text-xs mt-1">Por favor ingresa tu usuario.</p>
+            {emailError && (
+              <p className="text-red-500 text-xs mt-1">Por favor ingresa tu correo.</p>
             )}
           </motion.div>
 

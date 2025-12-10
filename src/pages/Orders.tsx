@@ -71,7 +71,10 @@ import { useOrders, Order } from "@/contexts/OrderContext";
 import { useCustomers } from "@/contexts/CustomerContext";
 import { useServices } from "@/contexts/ServiceContext";
 
+import { useAuth } from "@/contexts/AuthContext";
+
 const Orders = () => {
+  const { isAdmin } = useAuth();
   const { orders, loading: ordersLoading, createOrder, updateOrder, updateOrderStatus, deleteOrder } = useOrders();
   const { customers, loading: customersLoading } = useCustomers();
   const { services: availableServices, loading: servicesLoading } = useServices();
@@ -368,21 +371,25 @@ const Orders = () => {
                 </DropdownMenuPortal>
             </DropdownMenuSub>
 
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => handleEditClick(order)}
-            >
-              <IoPencilOutline className="mr-2 h-4 w-4" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="cursor-pointer text-red-600 focus:text-red-600"
-              onClick={() => handleDeleteClick(order.id)}
-            >
-              <IoTrashOutline className="mr-2 h-4 w-4" />
-              Eliminar
-            </DropdownMenuItem>
+            {isAdmin && (
+              <>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => handleEditClick(order)}
+                >
+                  <IoPencilOutline className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer text-red-600 focus:text-red-600"
+                  onClick={() => handleDeleteClick(order.id)}
+                >
+                  <IoTrashOutline className="mr-2 h-4 w-4" />
+                  Eliminar
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
