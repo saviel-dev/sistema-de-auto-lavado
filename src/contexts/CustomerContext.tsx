@@ -2,28 +2,40 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
+export interface Vehicle {
+  id: number;
+  cliente_id: number;
+  tipo: string;
+  placa: string;
+  imagenes: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Customer {
   id: number;
   name: string;
   email: string;
-  phone: string;
-  vehicle: string;
-  vehicleType: string;
-  licensePlate: string;
+  phones: string[]; // Changed from single phone to array (max 3)
   status: "VIP" | "Regular" | "Normal";
   visits: number;
   image?: string;
-  images?: string[]; // Nueva propiedad para galería
+  vehicles?: Vehicle[]; // Changed from individual vehicle fields to array
 }
 
 interface CustomerContextType {
   customers: Customer[];
   loading: boolean;
-  addCustomer: (customer: Omit<Customer, 'id' | 'visits'>) => Promise<void>;
+  addCustomer: (customer: Omit<Customer, 'id' | 'visits' | 'vehicles'>) => Promise<void>;
   updateCustomer: (id: number, updates: Partial<Customer>) => Promise<void>;
   deleteCustomer: (id: number) => Promise<void>;
   refreshCustomers: () => Promise<void>;
-  uploadImage: (file: File) => Promise<string>; // Nueva función
+  uploadImage: (file: File) => Promise<string>;
+  // Vehicle operations
+  addVehicle: (clienteId: number, vehicle: Omit<Vehicle, 'id' | 'cliente_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateVehicle: (vehicleId: number, updates: Partial<Omit<Vehicle, 'id' | 'cliente_id' | 'created_at' | 'updated_at'>>) => Promise<void>;
+  deleteVehicle: (vehicleId: number) => Promise<void>;
+  uploadVehicleImage: (file: File) => Promise<string>;
 }
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
@@ -32,31 +44,47 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const mapSupabaseToCustomer = (data: any): Customer => ({
+  const mapSupabaseToCustomer = (data: any, vehicles: Vehicle[]): Customer => ({
     id: data.id,
     name: data.nombre,
     email: data.email,
-    phone: data.telefono,
-    vehicle: data.vehiculo,
-    vehicleType: data.tipo_vehiculo,
-    licensePlate: data.placa,
+    phones: data.telefonos || [],
     status: data.estado,
     visits: data.visitas,
     image: data.imagen_url,
-    images: data.imagenes || [] // Mapear array de imágenes
+    vehicles: vehicles.filter(v => v.cliente_id === data.id)
   });
 
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('*')
-        .order('id', { ascending: false });
+      
+      // Fetch customers and vehicles separately, then combine
+      const [customersResult, vehiclesResult] = await Promise.all([
+        supabase
+          .from('clientes')
+          .select('*')
+          .order('id', { ascending: false }),
+        supabase
+          .from('vehiculos')
+          .select('*')
+          .order('cliente_id', { ascending: false })
+      ]);
 
-      if (error) throw error;
+      if (customersResult.error) throw customersResult.error;
+      if (vehiclesResult.error) throw vehiclesResult.error;
 
-      setCustomers(data?.map(mapSupabaseToCustomer) || []);
+      const vehicles: Vehicle[] = (vehiclesResult.data || []).map((v: any) => ({
+        id: v.id,
+        cliente_id: v.cliente_id,
+        tipo: v.tipo,
+        placa: v.placa,
+        imagenes: v.imagenes || [],
+        created_at: v.created_at,
+        updated_at: v.updated_at
+      }));
+
+      setCustomers(customersResult.data?.map(data => mapSupabaseToCustomer(data, vehicles)) || []);
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast.error('Error al cargar clientes');
@@ -95,18 +123,14 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const addCustomer = async (customerData: Omit<Customer, 'id' | 'visits'>) => {
+  const addCustomer = async (customerData: Omit<Customer, 'id' | 'visits' | 'vehicles'>) => {
     try {
       const dbData = {
         nombre: customerData.name,
         email: customerData.email,
-        telefono: customerData.phone,
-        vehiculo: customerData.vehicle,
-        tipo_vehiculo: customerData.vehicleType,
-        placa: customerData.licensePlate,
+        telefonos: customerData.phones || [],
         estado: customerData.status,
         imagen_url: customerData.image,
-        imagenes: customerData.images || [], // Guardar array
         visitas: 0
       };
 
@@ -128,13 +152,9 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
       const dbUpdates: any = {};
       if (updates.name) dbUpdates.nombre = updates.name;
       if (updates.email) dbUpdates.email = updates.email;
-      if (updates.phone) dbUpdates.telefono = updates.phone;
-      if (updates.vehicle) dbUpdates.vehiculo = updates.vehicle;
-      if (updates.vehicleType) dbUpdates.tipo_vehiculo = updates.vehicleType;
-      if (updates.licensePlate) dbUpdates.placa = updates.licensePlate;
+      if (updates.phones) dbUpdates.telefonos = updates.phones;
       if (updates.status) dbUpdates.estado = updates.status;
       if (updates.image) dbUpdates.imagen_url = updates.image;
-      if (updates.images) dbUpdates.imagenes = updates.images; // Guardar array
       if (updates.visits !== undefined) dbUpdates.visitas = updates.visits;
 
       const { error } = await supabase
@@ -171,6 +191,105 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
+  // =====================================================
+  // VEHICLE CRUD OPERATIONS
+  // =====================================================
+  
+  const uploadVehicleImage = async (file: File): Promise<string> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('vehiculos')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data } = supabase.storage
+        .from('vehiculos')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error: any) {
+      console.error('Error uploading vehicle image:', error);
+      toast.error('Error al subir imagen del vehículo: ' + error.message);
+      throw error;
+    }
+  };
+
+  const addVehicle = async (
+    clienteId: number,
+    vehicle: Omit<Vehicle, 'id' | 'cliente_id' | 'created_at' | 'updated_at'>
+  ) => {
+    try {
+      const dbData = {
+        cliente_id: clienteId,
+        tipo: vehicle.tipo,
+        placa: vehicle.placa,
+        imagenes: vehicle.imagenes || []
+      };
+
+      const { error } = await supabase.from('vehiculos').insert([dbData]);
+
+      if (error) throw error;
+
+      toast.success('Vehículo agregado correctamente');
+      await fetchCustomers();
+    } catch (error: any) {
+      console.error('Error adding vehicle:', error);
+      toast.error('Error al agregar vehículo: ' + error.message);
+      throw error;
+    }
+  };
+
+  const updateVehicle = async (
+    vehicleId: number,
+    updates: Partial<Omit<Vehicle, 'id' | 'cliente_id' | 'created_at' | 'updated_at'>>
+  ) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.tipo) dbUpdates.tipo = updates.tipo;
+      if (updates.placa) dbUpdates.placa = updates.placa;
+      if (updates.imagenes) dbUpdates.imagenes = updates.imagenes;
+
+      const { error } = await supabase
+        .from('vehiculos')
+        .update(dbUpdates)
+        .eq('id', vehicleId);
+
+      if (error) throw error;
+
+      toast.success('Vehículo actualizado correctamente');
+      await fetchCustomers();
+    } catch (error: any) {
+      console.error('Error updating vehicle:', error);
+      toast.error('Error al actualizar vehículo: ' + error.message);
+      throw error;
+    }
+  };
+
+  const deleteVehicle = async (vehicleId: number) => {
+    try {
+      const { error } = await supabase
+        .from('vehiculos')
+        .delete()
+        .eq('id', vehicleId);
+
+      if (error) throw error;
+
+      toast.success('Vehículo eliminado correctamente');
+      await fetchCustomers();
+    } catch (error: any) {
+      console.error('Error deleting vehicle:', error);
+      toast.error('Error al eliminar vehículo: ' + error.message);
+      throw error;
+    }
+  };
+
   return (
     <CustomerContext.Provider
       value={{
@@ -180,7 +299,11 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
         updateCustomer,
         deleteCustomer,
         refreshCustomers: fetchCustomers,
-        uploadImage
+        uploadImage,
+        addVehicle,
+        updateVehicle,
+        deleteVehicle,
+        uploadVehicleImage
       }}
     >
       {children}

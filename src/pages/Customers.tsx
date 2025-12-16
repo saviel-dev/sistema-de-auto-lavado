@@ -18,7 +18,8 @@ import {
   IoEyeOutline,
   IoReloadOutline,
   IoImagesOutline,
-  IoCloseCircle
+  IoCloseCircle,
+  IoClose
 } from "react-icons/io5";
 import { FaWhatsapp } from 'react-icons/fa';
 import {
@@ -38,33 +39,43 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { useCustomers, Customer } from "@/contexts/CustomerContext";
+import { useCustomers, Customer, Vehicle } from "@/contexts/CustomerContext";
+import VehicleModal from "@/components/VehicleModal";
 
 const Customers = () => {
-  const { customers, loading, addCustomer, updateCustomer, deleteCustomer, refreshCustomers, uploadImage } = useCustomers();
+  const { 
+    customers, 
+    loading, 
+    addCustomer, 
+    updateCustomer, 
+    deleteCustomer, 
+    refreshCustomers, 
+    uploadImage,
+    addVehicle,
+    updateVehicle,
+    deleteVehicle,
+    uploadVehicleImage
+  } = useCustomers();
+  
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchCriterion, setSearchCriterion] = useState<'name' | 'plate'>('name');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const { toast } = useToast();
   const [uploadingImages, setUploadingImages] = useState(false);
 
-  const [formData, setFormData] = useState<Omit<Customer, 'id'>>({
+  const [formData, setFormData] = useState<Omit<Customer, 'id' | 'vehicles' | 'image'>>({ 
     name: "",
     email: "",
-    phone: "",
-    vehicle: "",
-    vehicleType: "",
-    licensePlate: "",
+    phones: [],
     status: "Normal",
-    image: "",
-    images: [],
     visits: 0
   });
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({
@@ -73,72 +84,32 @@ const Customers = () => {
     }));
   };
 
-  /* Perfil */
-  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        setUploadingImages(true);
-        const url = await uploadImage(file);
-        setFormData(prev => ({ ...prev, image: url }));
-        toast({ title: "Foto subida correctamente" });
-      } catch (error) {
-        // Error handling in context
-      } finally {
-        setUploadingImages(false);
-      }
+  const addPhone = () => {
+    if (formData.phones.length < 3) {
+      setFormData(prev => ({ ...prev, phones: [...prev.phones, ""] }));
     }
   };
 
-  /* Galería */
-  const handleGalleryUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      try {
-        setUploadingImages(true);
-        const uploadPromises = Array.from(files).map(file => uploadImage(file));
-        const urls = await Promise.all(uploadPromises);
-        
-        setFormData(prev => ({
-          ...prev,
-          images: [...(prev.images || []), ...urls]
-        }));
-        
-        toast({ title: "Galería actualizada", description: `${urls.length} fotos subidas.` });
-      } catch (error) {
-        // Error handled in context
-      } finally {
-        setUploadingImages(false);
-      }
-    }
-  };
-
-  const removeGalleryImage = (index: number) => {
+  const removePhone = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      images: prev.images?.filter((_, i) => i !== index) || []
+      phones: prev.phones.filter((_, i) => i !== index)
     }));
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
-  const triggerGalleryInput = () => {
-    galleryInputRef.current?.click();
+  const updatePhone = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      phones: prev.phones.map((p, i) => i === index ? value : p)
+    }));
   };
 
   const handleAddNewClick = () => {
     setFormData({
       name: "",
       email: "",
-      phone: "",
-      vehicle: "",
-      vehicleType: "",
-      licensePlate: "",
+      phones: [],
       status: "Normal",
-      image: "",
-      images: [],
       visits: 0
     });
     setEditingId(null);
@@ -149,13 +120,8 @@ const Customers = () => {
     setFormData({
       name: customer.name,
       email: customer.email,
-      phone: customer.phone,
-      vehicle: customer.vehicle,
-      vehicleType: customer.vehicleType,
-      licensePlate: customer.licensePlate,
+      phones: customer.phones || [],
       status: customer.status,
-      image: customer.image || "",
-      images: customer.images || [],
       visits: customer.visits
     });
     setEditingId(customer.id);
@@ -175,10 +141,10 @@ const Customers = () => {
 
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.phone) {
+    if (!formData.name || !formData.email || formData.phones.length === 0) {
       toast({
         title: "Error",
-        description: "Por favor complete los campos obligatorios.",
+        description: "Por favor complete nombre, email y al menos un teléfono.",
         variant: "destructive",
       });
       return;
@@ -196,12 +162,18 @@ const Customers = () => {
     }
   };
 
-  const filteredCustomers = customers.filter(customer => 
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.vehicle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.licensePlate.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCustomers = customers.filter(customer => {
+    const searchLower = searchTerm.toLowerCase();
+    
+    if (searchCriterion === 'name') {
+      return customer.name.toLowerCase().includes(searchLower);
+    } else {
+      // Search by vehicle plate
+      return customer.vehicles?.some(vehicle =>
+        vehicle.placa.toLowerCase().includes(searchLower)
+      );
+    }
+  });
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -233,55 +205,17 @@ const Customers = () => {
             </DialogHeader>
             
             <div className="space-y-4 py-2">
-              {/* Sección de imagen */}
-              <div className="space-y-1">
-                <Label className="text-sm">Foto del perfil</Label>
-                <div className="flex items-center gap-3">
-                  <div className="relative h-16 w-16 rounded-full overflow-hidden border-2 border-dashed border-muted-foreground/20 flex-shrink-0">
-                    {formData.image ? (
-                      <img 
-                        src={formData.image} 
-                        alt="Preview" 
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-muted/50 flex items-center justify-center">
-                        <IoPeopleOutline className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={triggerFileInput}
-                      className="text-xs h-8"
-                    >
-                      {formData.image ? 'Cambiar foto' : 'Subir foto'}
-                    </Button>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageUpload}
-                      accept="image/*"
-                      className="hidden"
-                      aria-label="Seleccionar imagen de perfil"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              {/* Campos del formulario en pares */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Campos del formulario */}
+              <div className="space-y-3">
                 {/* Nombre */}
                 <div className="space-y-1">
-                  <Label htmlFor="name" className="text-sm">Nombre</Label>
+                  <Label htmlFor="name" className="text-sm">Nombre completo *</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    placeholder="Ej: Juan Pérez"
+                    placeholder="Ej: Julián Herrera"
                     className="h-9 text-sm"
                     required
                   />
@@ -289,7 +223,7 @@ const Customers = () => {
 
                 {/* Email */}
                 <div className="space-y-1">
-                  <Label htmlFor="email" className="text-sm">Email</Label>
+                  <Label htmlFor="email" className="text-sm">Correo electrónico *</Label>
                   <Input
                     id="email"
                     type="email"
@@ -301,57 +235,59 @@ const Customers = () => {
                   />
                 </div>
 
-                {/* Teléfono */}
-                <div className="space-y-1">
-                  <Label htmlFor="phone" className="text-sm">Teléfono</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="Ej: 584123456789"
-                    className="h-9 text-sm"
-                    required
-                  />
-                </div>
-
-                {/* Vehículo */}
-                <div className="space-y-1">
-                  <Label htmlFor="vehicle" className="text-sm">Vehículo</Label>
-                  <Input
-                    id="vehicle"
-                    value={formData.vehicle}
-                    onChange={handleInputChange}
-                    placeholder="Ej: Toyota Corolla"
-                    className="h-9 text-sm"
-                    required
-                  />
-                </div>
-
-                {/* Tipo de vehículo */}
-                <div className="space-y-1">
-                  <Label htmlFor="vehicleType" className="text-sm">Tipo</Label>
-                  <Input
-                    id="vehicleType"
-                    value={formData.vehicleType}
-                    onChange={handleInputChange}
-                    placeholder="Ej: Sedán, SUV, Camioneta"
-                    className="h-9 text-sm"
-                    required
-                  />
-                </div>
-
-                {/* Placa */}
-                <div className="space-y-1">
-                  <Label htmlFor="licensePlate" className="text-sm">Placa</Label>
-                  <Input
-                    id="licensePlate"
-                    value={formData.licensePlate}
-                    onChange={handleInputChange}
-                    placeholder="Ej: ABC123"
-                    className="h-9 text-sm"
-                    required
-                  />
+                {/* Teléfonos */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Teléfono(s) *</Label>
+                    {formData.phones.length < 3 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addPhone}
+                        className="h-7 text-xs"
+                      >
+                        <IoAddOutline className="h-3 w-3 mr-1" />
+                        Agregar teléfono
+                      </Button>
+                    )}
+                  </div>
+                  {formData.phones.length === 0 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addPhone}
+                      className="w-full h-9 text-sm"
+                    >
+                      <IoAddOutline className="h-4 w-4 mr-2" />
+                      Agregar primer teléfono
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      {formData.phones.map((phone, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input
+                            value={phone}
+                            onChange={(e) => updatePhone(index, e.target.value)}
+                            placeholder="Ej: 0414 1234567"
+                            className="h-9 text-sm flex-1"
+                            required
+                          />
+                          {formData.phones.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removePhone(index)}
+                              className="h-9 w-9"
+                            >
+                              <IoClose className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Estado */}
@@ -369,54 +305,82 @@ const Customers = () => {
                     <option value="VIP">VIP</option>
                   </select>
                 </div>
+
+                {/* Vehículos Section */}
+                <div className="space-y-2 pt-2 border-t">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Vehículos</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (!editingId) {
+                          toast({
+                            title: "Información",
+                            description: "Primero guarde el cliente para poder agregar vehículos.",
+                            variant: "default",
+                          });
+                          return;
+                        }
+                        setEditingVehicle(null);
+                        setIsVehicleModalOpen(true);
+                      }}
+                      className="h-8 gap-2"
+                    >
+                      <IoCarSportOutline className="h-4 w-4" />
+                      Agregar vehículo
+                    </Button>
+                  </div>
+                  
+                  {/* Vehicle List */}
+                  {editingId ? (
+                    customers.find(c => c.id === editingId)?.vehicles && customers.find(c => c.id === editingId)!.vehicles!.length > 0 ? (
+                      <div className="space-y-2">
+                        {customers.find(c => c.id === editingId)?.vehicles?.map((vehicle) => (
+                          <div key={vehicle.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-muted/50">
+                            <span className="text-sm">
+                              <strong>{vehicle.tipo}</strong> / {vehicle.placa}
+                            </span>
+                            <div className="flex gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setEditingVehicle(vehicle);
+                                  setIsVehicleModalOpen(true);
+                                }}
+                                className="h-8 w-8"
+                              >
+                                <IoPencilOutline className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteVehicle(vehicle.id)}
+                                className="h-8 w-8 text-destructive"
+                              >
+                                <IoTrashOutline className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 border-2 border-dashed rounded-md text-center text-muted-foreground text-sm">
+                        No hay vehículos registrados. Agregue uno presionando el botón de arriba.
+                      </div>
+                    )
+                  ) : (
+                    <div className="p-4 border-2 border-dashed rounded-md text-center text-muted-foreground text-sm">
+                      Primero guarde el cliente para poder agregar vehículos.
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Sección Galería */}
-              <div className="space-y-2 pt-2 border-t">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Galería de Fotos del Vehículo (6-10)</Label>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    onClick={triggerGalleryInput}
-                    disabled={uploadingImages}
-                    className="h-8 gap-2"
-                  >
-                    <IoImagesOutline className="h-4 w-4" />
-                    {uploadingImages ? 'Subiendo...' : 'Agregar Fotos'}
-                  </Button>
-                  <input
-                    type="file"
-                    ref={galleryInputRef}
-                    onChange={handleGalleryUpload}
-                    multiple
-                    accept="image/*"
-                    className="hidden"
-                  />
-                </div>
-                
-                {formData.images && formData.images.length > 0 ? (
-                  <div className="grid grid-cols-4 gap-2 mt-2">
-                     {formData.images.map((img, index) => (
-                       <div key={index} className="relative group aspect-square rounded-md overflow-hidden bg-muted border">
-                         <img src={img} alt={`Foto ${index}`} className="w-full h-full object-cover" />
-                         <button
-                           type="button"
-                           onClick={() => removeGalleryImage(index)}
-                           className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                         >
-                           <IoCloseCircle className="h-4 w-4" />
-                         </button>
-                       </div>
-                     ))}
-                  </div>
-                ) : (
-                  <div className="p-4 border-2 border-dashed rounded-md text-center text-muted-foreground text-sm">
-                    No hay fotos en la galería
-                  </div>
-                )}
-              </div>
             </div>
             
             <DialogFooter className="pt-2">
@@ -442,30 +406,11 @@ const Customers = () => {
 
         {/* View Profile Dialog */}
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-          <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden [&>button]:text-muted-foreground [&>button]:hover:text-foreground">
-            <DialogHeader className="bg-gradient-to-r from-purple-600 to-blue-600 p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {viewingCustomer?.image ? (
-                    <img 
-                      src={viewingCustomer.image} 
-                      alt={viewingCustomer.name} 
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '';
-                        target.outerHTML = `
-                          <div class="h-full w-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-500 text-white text-2xl font-bold">
-                            ${viewingCustomer.name?.charAt(0) || 'U'}
-                          </div>
-                        `;
-                      }}
-                    />
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-500 text-white text-2xl font-bold">
-                      {viewingCustomer?.name?.charAt(0) || 'U'}
-                    </div>
-                  )}
+          <DialogContent className="max-w-lg">
+            <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-white shadow-lg flex-shrink-0 bg-gradient-to-br from-purple-500 to-blue-500 text-white text-2xl font-bold flex items-center justify-center">
+                  {viewingCustomer?.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
                 <div>
                   <DialogTitle className="text-white text-lg">{viewingCustomer?.name}</DialogTitle>
@@ -475,14 +420,28 @@ const Customers = () => {
             </DialogHeader>
             
             <div className="p-4">
-              {/* Galería en Perfil */}
-              {viewingCustomer?.images && viewingCustomer.images.length > 0 && (
+              {/* Vehicles Section in Profile */}
+              {viewingCustomer?.vehicles && viewingCustomer.vehicles.length > 0 && (
                 <div className="mb-4">
-                  <p className="text-sm font-medium mb-2">Galería de Fotos</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {viewingCustomer.images.map((img, idx) => (
-                      <div key={idx} className="aspect-square rounded-md overflow-hidden bg-muted border cursor-pointer hover:opacity-90" onClick={() => window.open(img, '_blank')}>
-                        <img src={img} alt="Vehículo" className="w-full h-full object-cover" />
+                  <p className="text-sm font-medium mb-2">Vehículos</p>
+                  <div className="space-y-2">
+                    {viewingCustomer.vehicles.map((vehicle, idx) => (
+                      <div key={idx} className="p-2 border rounded-md">
+                        <p className="text-sm font-medium">{vehicle.tipo} - {vehicle.placa}</p>
+                        {vehicle.imagenes && vehicle.imagenes.length > 0 && (
+                          <div className="grid grid-cols-4 gap-1 mt-2">
+                            {vehicle.imagenes.slice(0, 4).map((img, imgIdx) => (
+                              <div key={imgIdx} className="aspect-square rounded overflow-hidden bg-muted border cursor-pointer" onClick={() => window.open(img, '_blank')}>
+                                <img src={img} alt={`Vehículo ${idx + 1}`} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                            {vehicle.imagenes.length > 4 && (
+                              <div className="aspect-square rounded bg-muted border flex items-center justify-center text-xs text-muted-foreground">
+                                +{vehicle.imagenes.length - 4}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -491,26 +450,22 @@ const Customers = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">Teléfono</p>
-                  <p className="text-sm text-muted-foreground">{viewingCustomer?.phone || 'No especificado'}</p>
+                  <p className="text-sm font-medium">Teléfono(s)</p>
+                  {viewingCustomer?.phones && viewingCustomer.phones.length > 0 ? (
+                    <div className="space-y-1">
+                      {viewingCustomer.phones.map((phone, idx) => (
+                        <p key={idx} className="text-sm text-muted-foreground">{phone}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No especificado</p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Email</p>
                   <p className="text-sm text-muted-foreground">{viewingCustomer?.email || 'No especificado'}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Vehículo</p>
-                  <p className="text-sm text-muted-foreground">{viewingCustomer?.vehicle || 'No especificado'}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Tipo de vehículo</p>
-                  <p className="text-sm text-muted-foreground">{viewingCustomer?.vehicleType || 'No especificado'}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Placa</p>
-                  <p className="text-sm text-muted-foreground font-mono">{viewingCustomer?.licensePlate || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2">
                   <p className="text-sm font-medium">Estado</p>
                   <Badge 
                     variant={
@@ -526,11 +481,11 @@ const Customers = () => {
             </div>
             
             <DialogFooter className="px-4 pb-4 gap-2">
-              {viewingCustomer?.phone && (
+              {viewingCustomer?.phones && viewingCustomer.phones.length > 0 && (
                 <Button 
                   variant="outline" 
                   className="w-full gap-2 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 hover:border-green-300"
-                  onClick={() => window.open(`https://wa.me/${viewingCustomer.phone.replace(/[^0-9]/g, '')}`, '_blank')}
+                  onClick={() => window.open(`https://wa.me/${viewingCustomer.phones[0].replace(/[^0-9]/g, '')}`, '_blank')}
                 >
                   <FaWhatsapp className="h-4 w-4" />
                   WhatsApp
@@ -546,6 +501,69 @@ const Customers = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Search Selection */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <IoSearchOutline className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder={searchCriterion === 'name' ? "Buscar por nombre..." : "Buscar por placa..."}
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          />
+          {showSuggestions && searchTerm && filteredCustomers.length > 0 && (
+            <ul className="absolute z-10 w-full bg-popover text-popover-foreground border rounded-md shadow-lg mt-1 max-h-60 overflow-auto">
+              {filteredCustomers.slice(0, 5).map((customer) => (
+                <li
+                  key={customer.id}
+                  className="px-4 py-2 hover:bg-muted cursor-pointer text-sm"
+                  onClick={() => {
+                    if (searchCriterion === 'name') {
+                      setSearchTerm(customer.name);
+                    } else {
+                      // Find the matching vehicle or default to first
+                      const matchingVehicle = customer.vehicles?.find(v => 
+                        v.placa.toLowerCase().includes(searchTerm.toLowerCase())
+                      );
+                      setSearchTerm(matchingVehicle?.placa || customer.vehicles?.[0]?.placa || customer.name);
+                    }
+                    setShowSuggestions(false);
+                  }}
+                >
+                  {searchCriterion === 'name' ? (
+                    <div className="font-medium">{customer.name}</div>
+                  ) : (
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {customer.vehicles?.find(v => v.placa.toLowerCase().includes(searchTerm.toLowerCase()))?.placa || customer.vehicles?.[0]?.placa}
+                      </span>
+                      <span className="text-xs text-muted-foreground">Cliente: {customer.name}</span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          value={searchCriterion}
+          onChange={(e) => {
+            setSearchCriterion(e.target.value as 'name' | 'plate');
+            setSearchTerm("");
+          }}
+        >
+          <option value="name">Por Nombre</option>
+          <option value="plate">Por Placa</option>
+        </select>
       </div>
 
       <Card className="hidden lg:block shadow-lg hover:shadow-xl transition-shadow">
@@ -567,23 +585,8 @@ const Customers = () => {
                     <tr key={customer.id} className="border-b hover:bg-muted/50">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-muted overflow-hidden flex-shrink-0">
-                            {customer.image ? (
-                              <img 
-                                src={customer.image} 
-                                alt={customer.name}
-                                className="h-full w-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.onerror = null;
-                                  target.src = '';
-                                }}
-                              />
-                            ) : (
-                              <div className="h-full w-full bg-primary/10 flex items-center justify-center">
-                                <IoPeopleOutline className="h-5 w-5 text-primary" />
-                              </div>
-                            )}
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold flex-shrink-0">
+                            {customer.name?.charAt(0)?.toUpperCase() || 'U'}
                           </div>
                           <div>
                             <div className="font-medium">{customer.name}</div>
@@ -592,11 +595,29 @@ const Customers = () => {
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="font-medium">{customer.vehicle}</div>
-                        <div className="text-sm text-muted-foreground">{customer.phone}</div>
+                        <div className="font-medium">
+                          {customer.vehicles && customer.vehicles.length > 0 
+                            ? `${customer.vehicles[0].tipo}` 
+                            : 'Sin vehículo'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {customer.phones && customer.phones.length > 0 
+                            ? customer.phones[0] 
+                            : 'Sin teléfono'}
+                        </div>
                       </td>
-                      <td className="p-4 font-mono">{customer.licensePlate}</td>
-                      <td className="p-4">{customer.vehicleType}</td>
+                      <td className="p-4 font-mono">
+                        {customer.vehicles && customer.vehicles.length > 0 
+                          ? customer.vehicles[0].placa 
+                          : '-'}
+                      </td>
+                      <td className="p-4">
+                        {customer.vehicles && customer.vehicles.length > 1
+                          ? `${customer.vehicles.length} vehículos`
+                          : customer.vehicles && customer.vehicles.length === 1
+                          ? customer.vehicles[0].tipo
+                          : '-'}
+                      </td>
                       <td className="p-4">
                         <Badge 
                           variant={
@@ -648,23 +669,8 @@ const Customers = () => {
           <Card key={customer.id} className="shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-start gap-4">
-                <div className="h-12 w-12 rounded-full bg-muted overflow-hidden flex-shrink-0 border">
-                  {customer.image ? (
-                    <img 
-                      src={customer.image} 
-                      alt={customer.name}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.onerror = null;
-                        target.src = '';
-                      }}
-                    />
-                  ) : (
-                    <div className="h-full w-full bg-primary/10 flex items-center justify-center">
-                      <IoPeopleOutline className="h-6 w-6 text-primary" />
-                    </div>
-                  )}
+                <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                  {customer.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
@@ -684,16 +690,25 @@ const Customers = () => {
                   </div>
                   
                   <div className="mt-3 space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <IoCarSportOutline className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{customer.vehicle}</span>
-                      <span className="text-muted-foreground text-xs">({customer.vehicleType})</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="bg-muted px-2 py-0.5 rounded text-xs font-mono">
-                        {customer.licensePlate}
+                    {customer.vehicles && customer.vehicles.length > 0 && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <IoCarSportOutline className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{customer.vehicles[0].tipo}</span>
+                        <span className="text-muted-foreground text-xs font-mono">({customer.vehicles[0].placa})</span>
+                        {customer.vehicles.length > 1 && (
+                          <span className="text-xs text-muted-foreground">+{customer.vehicles.length - 1} más</span>
+                        )}
                       </div>
-                    </div>
+                    )}
+                    {customer.phones && customer.phones.length > 0 && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <IoCallOutline className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">{customer.phones[0]}</span>
+                        {customer.phones.length > 1 && (
+                          <span className="text-xs text-muted-foreground">+{customer.phones.length - 1}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -734,6 +749,24 @@ const Customers = () => {
           </Card>
         ))}
       </div>
+
+      {/* Vehicle Modal */}
+      <VehicleModal
+        open={isVehicleModalOpen}
+        onOpenChange={setIsVehicleModalOpen}
+        customerId={editingId || 0}
+        vehicle={editingVehicle || undefined}
+        onSave={async (vehicleData) => {
+          if (editingId) {
+            if (editingVehicle) {
+              await updateVehicle(editingVehicle.id, vehicleData);
+            } else {
+              await addVehicle(editingId, vehicleData);
+            }
+          }
+        }}
+        uploadImage={uploadVehicleImage}
+      />
     </div>
   );
 };
