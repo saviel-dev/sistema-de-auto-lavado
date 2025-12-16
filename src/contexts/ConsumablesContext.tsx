@@ -11,6 +11,7 @@ export interface Consumable {
   unit: string;
   minStock: number;
   cost: number;
+  // image_url removed
 }
 
 interface ConsumablesContextType {

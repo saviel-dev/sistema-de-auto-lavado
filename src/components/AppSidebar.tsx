@@ -9,7 +9,15 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { 
   IoSpeedometerOutline,
   IoCarSportOutline,
@@ -21,13 +29,69 @@ import {
   IoSettingsOutline,
   IoBarChartOutline,
   IoFlaskOutline,
+  IoCubeOutline,
+  IoChevronForwardOutline,
 } from "react-icons/io5";
 
-const menuItems = [
+// Define menu structure with potential support for subgroups
+type MenuItem = {
+  title: string;
+  url?: string;
+  icon?: any;
+  items?: {
+    title: string;
+    url: string;
+    icon?: any;
+  }[];
+};
+
+const menuStructure: MenuItem[] = [
   {
     title: "Dashboard",
     url: "/dashboard",
     icon: IoSpeedometerOutline,
+  },
+  {
+    title: "Productos",
+    icon: IoCubeOutline,
+    items: [
+      {
+        title: "Inventario",
+        url: "/inventory",
+        icon: IoLayersOutline,
+      },
+      {
+        title: "Insumos",
+        url: "/consumables",
+        icon: IoFlaskOutline,
+      },
+      {
+        title: "Movimientos",
+        url: "/movements",
+        icon: IoSwapHorizontalOutline,
+      }
+    ]
+  },
+  {
+    title: "Autolavado",
+    icon: IoCarSportOutline,
+    items: [
+      {
+        title: "Clientes",
+        url: "/customers",
+        icon: IoPeopleOutline,
+      },
+      {
+        title: "Servicios",
+        url: "/services",
+        icon: IoCarSportOutline,
+      },
+      {
+        title: "Pedidos",
+        url: "/appointments",
+        icon: IoCalendarOutline,
+      }
+    ]
   },
   {
     title: "POS",
@@ -35,60 +99,26 @@ const menuItems = [
     icon: IoCashOutline,
   },
   {
-    title: "Servicios",
-    url: "/services",
-    icon: IoCarSportOutline,
-  },
-  {
-    title: "Inventario",
-    url: "/inventory",
-    icon: IoLayersOutline,
-  },
-  {
-    title: "Insumos",
-    url: "/consumables",
-    icon: IoFlaskOutline,
-  },
-  {
-    title: "Movimientos",
-    url: "/movements",
-    icon: IoSwapHorizontalOutline,
-  },
-  {
-    title: "Pedidos",
-    url: "/appointments",
-    icon: IoCalendarOutline,
-  },
-  {
-    title: "Clientes",
-    url: "/customers",
-    icon: IoPeopleOutline,
-  },
-  {
-    title: "Configuración",
-    url: "/settings",
-    icon: IoSettingsOutline,
-  },
-  {
     title: "Reportes",
     url: "/reports",
     icon: IoBarChartOutline,
+  },
+  {
+    title: "Ajustes",
+    url: "/settings",
+    icon: IoSettingsOutline,
   },
 ];
 
 import { useAuth } from "@/contexts/AuthContext";
 
-// ... (keep imports)
-
-// ... (keep menuItems definition)
-
 export function AppSidebar() {
   const location = useLocation();
   const { isAdmin } = useAuth();
 
-  const filteredMenuItems = menuItems.filter(item => {
+  const filteredItems = menuStructure.filter(item => {
     // Hide Settings for non-admins
-    if (item.title === "Configuración" && !isAdmin) {
+    if (item.title === "Ajustes" && !isAdmin) {
         return false;
     }
     return true;
@@ -105,38 +135,57 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {filteredMenuItems.map((item) => {
+              {filteredItems.map((item) => {
                 const Icon = item.icon;
+                
+                // Render Group (Collapsible)
+                if (item.items) {
+                     // Check if any child is active to default open
+                    const isChildActive = item.items.some(child => location.pathname === child.url);
+                    
+                    return (
+                        <Collapsible key={item.title} defaultOpen={isChildActive} className="group/collapsible">
+                            <SidebarMenuItem>
+                                <CollapsibleTrigger asChild>
+                                    <SidebarMenuButton tooltip={item.title} className="w-full justify-between">
+                                        <div className="flex items-center gap-2">
+                                            {Icon && <Icon className="h-5 w-5" />}
+                                            <span>{item.title}</span>
+                                        </div>
+                                        <IoChevronForwardOutline className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                                    </SidebarMenuButton>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                                    <SidebarMenuSub>
+                                        {item.items.map((subItem) => {
+                                            const SubIcon = subItem.icon;
+                                            const isSubActive = location.pathname === subItem.url;
+                                            return (
+                                                <SidebarMenuSubItem key={subItem.title}>
+                                                    <SidebarMenuSubButton asChild isActive={isSubActive}>
+                                                        <NavLink to={subItem.url}>
+                                                            {SubIcon && <SubIcon className="h-4 w-4 mr-2" />}
+                                                            <span>{subItem.title}</span>
+                                                        </NavLink>
+                                                    </SidebarMenuSubButton>
+                                                </SidebarMenuSubItem>
+                                            );
+                                        })}
+                                    </SidebarMenuSub>
+                                </CollapsibleContent>
+                            </SidebarMenuItem>
+                        </Collapsible>
+                    );
+                }
+
+                // Render Single Item
                 const isActive = location.pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <NavLink
-                        to={item.url}
-                        className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-all relative overflow-hidden group ${
-                          isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                            : "text-sidebar-foreground hover:bg-primary/10 hover:text-primary"
-                        }`}
-                      >
-                        {({ isActive }) => (
-                          <motion.div
-                            className="flex items-center gap-3 w-full z-10"
-                            whileHover={{ x: 5 }}
-                            whileTap={{ scale: 0.95 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                          >
-                            <Icon className="h-5 w-5" />
-                            <span>{item.title}</span>
-                            {isActive && (
-                              <motion.div
-                                layoutId="active-pill"
-                                className="absolute inset-0 bg-sidebar-accent opacity-100 -z-10 rounded-lg"
-                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                              />
-                            )}
-                          </motion.div>
-                        )}
+                    <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
+                      <NavLink to={item.url!} className={isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}>
+                        {Icon && <Icon className="h-5 w-5" />}
+                        <span>{item.title}</span>
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

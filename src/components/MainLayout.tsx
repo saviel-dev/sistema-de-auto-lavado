@@ -17,7 +17,7 @@ const MainLayout = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 md:h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card">
             <SidebarTrigger className="text-foreground" />
             <Button

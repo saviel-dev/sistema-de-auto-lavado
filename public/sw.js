@@ -39,6 +39,17 @@ self.addEventListener('activate', (event) => {
 
 // Estrategia: Network First, falling back to cache
 self.addEventListener('fetch', (event) => {
+  // Only cache GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Skip caching for API requests (Supabase)
+  const url = new URL(event.request.url);
+  if (url.origin.includes('supabase.co')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {

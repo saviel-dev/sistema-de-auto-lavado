@@ -41,7 +41,7 @@ const App = () => {
            toast.error("Error conectando con Supabase: " + error.message);
         } else {
            console.log('Conexión a Supabase exitosa');
-           toast.success("Conexión a base de datos establecida correctamente");
+           // toast.success("Conexión a base de datos establecida correctamente");
         }
       } catch (err) {
         console.error('Error inesperado:', err);
