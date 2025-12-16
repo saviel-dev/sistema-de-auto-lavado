@@ -17,7 +17,7 @@ export interface Movement {
 interface MovementContextType {
   movements: Movement[];
   loading: boolean;
-  addMovement: (movement: Omit<Movement, 'id' | 'created_at'>) => Promise<void>;
+  addMovement: (movement: Omit<Movement, 'id' | 'created_at' | 'item_name'>) => Promise<void>;
   refreshMovements: () => Promise<void>;
 }
 
@@ -34,9 +34,8 @@ export const MovementProvider: React.FC<{ children: ReactNode }> = ({ children }
         .from('movimientos')
         .select(`
           *,
-          productos (
-            nombre
-          )
+          productos ( nombre ),
+          insumos ( nombre )
         `)
         .order('fecha', { ascending: false });
 
@@ -45,16 +44,19 @@ export const MovementProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
 
-      const mappedMovements: Movement[] = data.map((m: any) => ({
-        id: m.id,
-        created_at: m.fecha,
-        item_id: m.producto_id,
-        item_type: 'product', // Currently table only supports products
-        item_name: m.productos?.nombre || 'Producto desconocido',
-        type: m.tipo,
-        quantity: m.cantidad,
-        reason: m.motivo,
-      }));
+      const mappedMovements: Movement[] = data.map((m: any) => {
+        const isProduct = !!m.producto_id;
+        return {
+          id: m.id,
+          created_at: m.fecha,
+          item_id: isProduct ? m.producto_id : m.insumo_id,
+          item_type: isProduct ? 'product' : 'consumable',
+          item_name: isProduct ? (m.productos?.nombre || 'Producto desconocido') : (m.insumos?.nombre || 'Insumo desconocido'),
+          type: m.tipo,
+          quantity: m.cantidad,
+          reason: m.motivo,
+        };
+      });
 
       setMovements(mappedMovements);
     } catch (error) {
@@ -68,19 +70,53 @@ export const MovementProvider: React.FC<{ children: ReactNode }> = ({ children }
     fetchMovements();
   }, []);
 
-  const addMovement = async (movement: Omit<Movement, 'id' | 'created_at'>) => {
+  const addMovement = async (movement: Omit<Movement, 'id' | 'created_at' | 'item_name'>) => {
     try {
-      const { error } = await supabase
+      // 1. Register movement in 'movimientos' table
+      const dbMovement = {
+        tipo: movement.type,
+        cantidad: movement.quantity,
+        motivo: movement.reason,
+        fecha: new Date().toISOString(),
+        producto_id: movement.item_type === 'product' ? movement.item_id : null,
+        insumo_id: movement.item_type === 'consumable' ? movement.item_id : null,
+      };
+
+      const { error: moveError } = await supabase
         .from('movimientos')
-        .insert([movement]);
+        .insert([dbMovement]);
 
-      if (error) throw error;
+      if (moveError) throw moveError;
 
-      toast.success('Movimiento registrado exitosamente');
+      // 2. Update Stock
+      const tableName = movement.item_type === 'product' ? 'productos' : 'insumos';
+      
+      // Get current stock first to ensure accuracy (or use RPC if available, but simple read-write for now)
+      const { data: currentItem, error: fetchError } = await supabase
+        .from(tableName)
+        .select('stock')
+        .eq('id', movement.item_id)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      
+      const currentStock = Number(currentItem.stock);
+      const newStock = movement.type === 'entrada' 
+        ? currentStock + Number(movement.quantity)
+        : Math.max(0, currentStock - Number(movement.quantity));
+
+      const { error: updateError } = await supabase
+        .from(tableName)
+        .update({ stock: newStock })
+        .eq('id', movement.item_id);
+
+      if (updateError) throw updateError;
+
+      toast.success('Movimiento registrado y stock actualizado');
       await fetchMovements();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding movement:', error);
-      toast.error('Error al registrar movimiento');
+      toast.error('Error al registrar movimiento: ' + (error.message || 'Error desconocido'));
       throw error;
     }
   };
