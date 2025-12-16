@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useNotifications } from './NotificationContext';
 
 export interface OrderItem {
   id?: number;
@@ -55,6 +56,7 @@ const OrderContext = createContext<OrderContextType | undefined>(undefined);
 export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addNotification } = useNotifications();
 
   const fetchOrders = async () => {
     try {
@@ -178,6 +180,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
 
       toast.success('Pedido creado exitosamente');
+      addNotification('success', 'Pedido Creado', `Nuevo pedido registrado - Total: $${total.toFixed(2)}`);
       return true;
     } catch (error) {
       console.error('Error creating order:', error);
@@ -203,6 +206,9 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         if (error) throw error;
         toast.success('Pedido actualizado');
+        if (updates.status) {
+          addNotification('info', 'Estado de Pedido', `Pedido actualizado a: ${updates.status}`);
+        }
         return true;
     } catch (error) {
         console.error("Error updating order", error);

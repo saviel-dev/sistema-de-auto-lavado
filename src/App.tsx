@@ -31,6 +31,7 @@ import { OrderProvider } from "./contexts/OrderContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { WorkerProvider } from "./contexts/WorkerContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <NotificationProvider>
       <AuthProvider>
         <ProductProvider>
           <ConsumablesProvider>
@@ -102,6 +104,7 @@ const App = () => {
         </ConsumablesProvider>
       </ProductProvider>
     </AuthProvider>
+    </NotificationProvider>
     </QueryClientProvider>
   );
 }

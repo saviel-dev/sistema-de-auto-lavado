@@ -4,12 +4,15 @@ import { SidebarToggle } from "@/components/ui/SidebarToggle";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { AnimatePresence, motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { signOut } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     navigate("/login");
   };
 

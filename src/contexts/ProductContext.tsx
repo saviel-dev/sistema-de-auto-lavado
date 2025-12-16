@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useNotifications } from './NotificationContext';
 
 export interface Product {
   id: number;
@@ -32,6 +33,7 @@ const ProductContext = createContext<ProductContextType | undefined>(undefined);
 export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addNotification } = useNotifications();
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -115,6 +117,7 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (error) throw error;
 
       toast.success('Producto agregado exitosamente');
+      addNotification('success', 'Producto Agregado', `${product.name} ha sido agregado al inventario`);
       await fetchProducts();
     } catch (error) {
       console.error('Error adding product:', error);
@@ -148,6 +151,7 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (error) throw error;
 
       toast.success('Producto actualizado exitosamente');
+      addNotification('info', 'Producto Actualizado', `${updates.name || 'Producto'} ha sido actualizado`);
       await fetchProducts();
     } catch (error) {
       console.error('Error updating product:', error);
@@ -165,7 +169,9 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       if (error) throw error;
 
+      const deletedProduct = products.find(p => p.id === id);
       toast.success('Producto eliminado exitosamente');
+      addNotification('warning', 'Producto Eliminado', `${deletedProduct?.name || 'Producto'} ha sido eliminado del inventario`);
       await fetchProducts();
     } catch (error) {
       console.error('Error deleting product:', error);

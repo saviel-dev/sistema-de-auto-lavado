@@ -5,36 +5,30 @@ import { IoCarSportOutline, IoEyeOutline, IoEyeOffOutline } from "react-icons/io
 
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { session, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [emailError, setEmailError] = useState(false);
-  const [particles, setParticles] = useState<Array<{ id: number; left: number; delay: number; duration: number; size: number; opacity: number }>>([]);
 
-  // Generate particles on mount & Load saved email
+  // Redirect to dashboard if already logged in and load saved email
   useEffect(() => {
-    const particleCount = 50;
-    const newParticles = Array.from({ length: particleCount }, (_, i) => ({
-      id: i,
-      left: Math.random() * 100,
-      delay: Math.random() * 5,
-      duration: Math.random() * 3 + 3,
-      size: Math.random() * 4 + 2,
-      opacity: Math.random() * 0.5 + 0.1,
-    }));
-    setParticles(newParticles);
-
+    if (!loading && session) {
+      navigate('/dashboard');
+    }
+    
     const savedEmail = localStorage.getItem('remember_email');
     if (savedEmail) {
       setEmail(savedEmail);
       setRememberMe(true);
     }
-  }, []);
+  }, [session, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,53 +66,17 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-indigo-50 via-purple-50 to-blue-50 animate-gradient">
-      {/* Animated gradient background */}
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-50 to-gray-100">
       <style>{`
-        @keyframes gradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        .animate-gradient {
-          background-size: 400% 400%;
-          animation: gradient 15s ease infinite;
-        }
         .glass-panel {
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.5);
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.8);
         }
       `}</style>
       
-      {/* Floating particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {particles.map((particle) => (
-          <motion.div
-            key={particle.id}
-            className="absolute rounded-full bg-indigo-500"
-            style={{
-              width: particle.size,
-              height: particle.size,
-              left: `${particle.left}vw`,
-              opacity: particle.opacity,
-            }}
-            initial={{ top: "-20px" }}
-            animate={{ top: "110vh" }}
-            transition={{
-              duration: particle.duration,
-              delay: particle.delay,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-          />
-        ))}
-      </div>
 
-      {/* Decorative background blobs */}
-      <div className="absolute top-10 left-10 w-64 h-64 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" />
-      <div className="absolute bottom-10 right-10 w-64 h-64 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000" />
 
       {/* Login Card */}
       <motion.div
@@ -223,28 +181,23 @@ const Login = () => {
             </motion.button>
           </motion.div>
 
-          {/* Additional Links */}
+          {/* Remember Me Checkbox */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.9 }}
-            className="flex items-center justify-between text-sm"
+            className="flex items-center text-sm"
           >
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="remember"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-600 border-gray-300 rounded cursor-pointer"
-              />
-              <label htmlFor="remember" className="ml-2 block text-gray-600 cursor-pointer select-none">
-                Mantener sesión
-              </label>
-            </div>
-            <a href="#" className="text-blue-500 hover:underline font-medium hover:text-indigo-600 transition-colors">
-              ¿No puedes acceder?
-            </a>
+            <input
+              type="checkbox"
+              id="remember"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-600 border-gray-300 rounded cursor-pointer"
+            />
+            <label htmlFor="remember" className="ml-2 block text-gray-600 cursor-pointer select-none">
+              Recordar mi correo electrónico
+            </label>
           </motion.div>
 
           {/* Submit Button */}
@@ -279,7 +232,7 @@ const Login = () => {
           transition={{ duration: 0.6, delay: 1.1 }}
           className="mt-8 border-t border-gray-200 pt-4"
         >
-          <p className="text-xs text-center text-gray-400">© 2024 Auto Lavado Gochi. Todos los derechos reservados.</p>
+          <p className="text-xs text-center text-gray-400">© 2025 Auto Lavado Gochi. Todos los derechos reservados.</p>
         </motion.div>
       </motion.div>
     </div>

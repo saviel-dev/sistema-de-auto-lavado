@@ -119,6 +119,7 @@ const menuStructure: MenuItem[] = [
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebar } from "@/components/ui/sidebar";
+import { NotificationButton } from "./NotificationButton";
 
 export function AppSidebar() {
   const location = useLocation();
@@ -232,18 +233,21 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-4 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
-        <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold shadow-sm ring-1 ring-primary/20 group-data-[collapsible=icon]:!size-8 transition-all">
-             {(profile?.nombre?.[0] || user?.email?.[0] || "U").toUpperCase()}
+        <div className="flex items-center justify-between gap-3 group-data-[collapsible=icon]:flex-col">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold shadow-sm ring-1 ring-primary/20 group-data-[collapsible=icon]:!size-8 transition-all">
+               {(profile?.nombre?.[0] || user?.email?.[0] || "U").toUpperCase()}
+            </div>
+            <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden text-left">
+              <span className="truncate text-sm font-bold text-foreground">
+                {profile?.nombre || "Administrador"}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {user?.email}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden text-left">
-            <span className="truncate text-sm font-bold text-foreground">
-              {profile?.nombre || "Administrador"}
-            </span>
-            <span className="truncate text-xs text-muted-foreground">
-              {user?.email}
-            </span>
-          </div>
+          <NotificationButton />
         </div>
       </SidebarFooter>
     </Sidebar>

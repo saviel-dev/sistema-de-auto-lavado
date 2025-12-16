@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useNotifications } from './NotificationContext';
 
 export interface Vehicle {
   id: number;
@@ -43,6 +44,7 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addNotification } = useNotifications();
 
   const mapSupabaseToCustomer = (data: any, vehicles: Vehicle[]): Customer => ({
     id: data.id,
@@ -139,6 +141,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (error) throw error;
 
       toast.success('Cliente agregado correctamente');
+      addNotification('success', 'Cliente Registrado', `${customerData.name} ha sido registrado exitosamente`);
       await fetchCustomers();
       return data.id;
     } catch (error: any) {
@@ -166,6 +169,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (error) throw error;
 
       toast.success('Cliente actualizado correctamente');
+      addNotification('info', 'Cliente Actualizado', `${updates.name || 'Cliente'} ha sido actualizado`);
       await fetchCustomers();
     } catch (error: any) {
       console.error('Error updating customer:', error);
@@ -239,6 +243,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (error) throw error;
 
       toast.success('Vehículo agregado correctamente');
+      addNotification('success', 'Vehículo Agregado', `Vehículo ${vehicle.placa} ha sido registrado`);
       await fetchCustomers();
     } catch (error: any) {
       console.error('Error adding vehicle:', error);
