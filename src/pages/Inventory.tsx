@@ -18,7 +18,7 @@ import {
   IoReloadOutline
 } from "react-icons/io5";
 import BarcodeScanner from "@/components/BarcodeScanner";
-import { validateBarcode, formatBarcode } from "@/lib/barcodeUtils";
+import { validateBarcode, formatBarcode, detectBarcodeType } from "@/lib/barcodeUtils";
 import { useProducts, Product } from "@/contexts/ProductContext";
 import {
   Dialog,
@@ -37,6 +37,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ViewModeToggle, ViewMode } from "@/components/ui/view-mode-toggle";
+import { CategoryAutocomplete } from "@/components/ui/CategoryAutocomplete";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const Inventory = () => {
   const { products, loading, addProduct, updateProduct, deleteProduct, refreshProducts } = useProducts();
@@ -51,6 +62,12 @@ const Inventory = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [barcodeSearch, setBarcodeSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem('inventory-view-mode');
+    return (saved as ViewMode) || 'cards';
+  });
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -61,6 +78,10 @@ const Inventory = () => {
     barcode: "",
   });
   const { toast } = useToast();
+
+  useEffect(() => {
+    localStorage.setItem('inventory-view-mode', viewMode);
+  }, [viewMode]);
 
   useEffect(() => {
     const fetchDolarRate = async () => {
@@ -195,10 +216,16 @@ const Inventory = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteProduct = async (e: React.MouseEvent, id: number) => {
+  const handleDeleteClick = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
-    if(confirm("¿Estás seguro de que quieres eliminar este producto?")) {
-      await deleteProduct(id);
+    setProductToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (productToDelete !== null) {
+      await deleteProduct(productToDelete);
+      setProductToDelete(null);
     }
   };
 
@@ -335,98 +362,262 @@ const Inventory = () => {
               ))}
             </select>
           </div>
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </motion.div>
 
-        <motion.div 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-          variants={containerVariants}
-        >
-          {loading ? (
-             Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-[350px] rounded-xl bg-muted/50 animate-pulse" />
-             ))
-          ) : (
-          filteredProducts.map((product, index) => (
-            <motion.div
-              key={product.id}
-              custom={index}
-              variants={itemVariants}
-            >
-              <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
-                <div className="relative h-48 w-full overflow-hidden bg-muted">
+        {/* Cards View */}
+        {viewMode === 'cards' && (
+          <motion.div 
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+            variants={containerVariants}
+          >
+            {loading ? (
+               Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-[350px] rounded-xl bg-muted/50 animate-pulse" />
+               ))
+            ) : (
+            filteredProducts.map((product, index) => (
+              <motion.div
+                key={product.id}
+                custom={index}
+                variants={itemVariants}
+              >
+                <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
+                  <div className="relative h-48 w-full overflow-hidden bg-muted">
+                      {product.image ? (
+                          <img 
+                              src={product.image} 
+                              alt={product.name}
+                              className="h-full w-full object-cover transition-transform duration-300 hover:scale-110"
+                          />
+                      ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-secondary/30">
+                              <IoCubeOutline className="h-12 w-12 text-muted-foreground/30" />
+                          </div>
+                      )}
+                    
+                    {product.barcode && (
+                      <div className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm rounded-md px-2 py-1 flex items-center gap-1 shadow-sm">
+                        <IoBarcodeOutline className="h-3 w-3 text-primary" />
+                        <span className="text-xs font-mono font-medium">{formatBarcode(product.barcode)}</span>
+                      </div>
+                    )}
+                    {/* Stock Badge */}
+                    <div className={`absolute bottom-2 left-2 px-2 py-0.5 rounded text-xs font-medium ${product.stock > 10 ? 'bg-green-100 text-green-700' : product.stock > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-destructive/10 text-destructive'}`}>
+                      Stock: {product.stock}
+                    </div>
+                  </div>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg line-clamp-1">
+                      {product.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1 pb-3">
+                    <div className="space-y-1">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-bold text-primary">
+                          ${parseFloat(product.price).toFixed(2)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">USD</span>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-base font-semibold text-foreground">
+                          Bs. {calculateBsPrice(product.price)}
+                        </span>
+                      </div>
+                      {product.category && (
+                          <div className="text-xs text-white mt-2 inline-block px-2 py-1 bg-primary rounded-full font-medium">
+                              {product.category}
+                          </div>
+                      )}
+                    </div>
+                  </CardContent>
+                  <CardFooter className="gap-2 justify-center pt-0 pb-4 px-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleEditClick(product)}
+                    >
+                      <IoPencilOutline className="h-4 w-4 mr-2" />
+                      Editar
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => handleDeleteClick(e, product.id)}
+                    >
+                      <IoTrashOutline className="h-4 w-4 mr-2" />
+                      Eliminar
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            ))
+            )}
+          </motion.div>
+        )}
+
+        {/* List View */}
+        {viewMode === 'list' && (
+          <motion.div 
+            className="space-y-3"
+            variants={containerVariants}
+          >
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-24 rounded-lg bg-muted/50 animate-pulse" />
+              ))
+            ) : (
+              filteredProducts.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  custom={index}
+                  variants={itemVariants}
+                  className="flex items-center gap-4 p-4 border rounded-lg hover:shadow-md transition-shadow bg-card"
+                >
+                  <div className="w-20 h-20 rounded-md overflow-hidden bg-muted flex-shrink-0">
                     {product.image ? (
-                        <img 
-                            src={product.image} 
-                            alt={product.name}
-                            className="h-full w-full object-cover transition-transform duration-300 hover:scale-110"
-                        />
+                      <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-secondary/30">
-                            <IoCubeOutline className="h-12 w-12 text-muted-foreground/30" />
-                        </div>
+                      <div className="w-full h-full flex items-center justify-center">
+                        <IoCubeOutline className="h-8 w-8 text-muted-foreground/30" />
+                      </div>
                     )}
-                  
-                  {product.barcode && (
-                    <div className="absolute top-2 right-2 bg-background/90 backdrop-blur-sm rounded-md px-2 py-1 flex items-center gap-1 shadow-sm">
-                      <IoBarcodeOutline className="h-3 w-3 text-primary" />
-                      <span className="text-xs font-mono font-medium">{formatBarcode(product.barcode)}</span>
-                    </div>
-                  )}
-                  {/* Stock Badge */}
-                  <div className={`absolute bottom-2 left-2 px-2 py-0.5 rounded text-xs font-medium ${product.stock > 10 ? 'bg-green-100 text-green-700' : product.stock > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-destructive/10 text-destructive'}`}>
-                    Stock: {product.stock}
                   </div>
-                </div>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg line-clamp-1">
-                    {product.name}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 pb-3">
-                  <div className="space-y-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold text-primary">
-                        ${parseFloat(product.price).toFixed(2)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">USD</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-base font-semibold text-foreground">
-                        Bs. {calculateBsPrice(product.price)}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-lg truncate">{product.name}</h3>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      <span className="text-sm font-medium text-primary">${parseFloat(product.price).toFixed(2)}</span>
+                      <span className="text-sm text-muted-foreground">Bs. {calculateBsPrice(product.price)}</span>
+                      {product.category && (
+                        <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                          {product.category}
+                        </span>
+                      )}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${product.stock > 10 ? 'bg-green-100 text-green-700' : product.stock > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-destructive/10 text-destructive'}`}>
+                        Stock: {product.stock}
                       </span>
                     </div>
-                    {product.category && (
-                        <div className="text-xs text-white mt-2 inline-block px-2 py-1 bg-primary rounded-full font-medium">
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleEditClick(product)}
+                    >
+                      <IoPencilOutline className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => handleDeleteClick(e, product.id)}
+                    >
+                      <IoTrashOutline className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </motion.div>
+        )}
+
+        {/* Table View */}
+        {viewMode === 'table' && (
+          <motion.div 
+            className="border rounded-lg overflow-hidden"
+            variants={containerVariants}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px]">Imagen</TableHead>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Categoría</TableHead>
+                  <TableHead>Precio USD</TableHead>
+                  <TableHead>Precio Bs</TableHead>
+                  <TableHead>Stock</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell colSpan={7}>
+                        <div className="h-12 bg-muted/50 animate-pulse rounded" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredProducts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      No se encontraron productos
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredProducts.map((product) => (
+                    <TableRow key={product.id} className="hover:bg-muted/50">
+                      <TableCell>
+                        <div className="w-12 h-12 rounded overflow-hidden bg-muted">
+                          {product.image ? (
+                            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <IoCubeOutline className="h-6 w-6 text-muted-foreground/30" />
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>
+                        {product.category ? (
+                          <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
                             {product.category}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-semibold text-primary">
+                        ${parseFloat(product.price).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        Bs. {calculateBsPrice(product.price)}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${product.stock > 10 ? 'bg-green-100 text-green-700' : product.stock > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-destructive/10 text-destructive'}`}>
+                          {product.stock}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleEditClick(product)}
+                          >
+                            <IoPencilOutline className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => handleDeleteClick(e, product.id)}
+                          >
+                            <IoTrashOutline className="h-4 w-4" />
+                          </Button>
                         </div>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter className="gap-2 justify-center pt-0 pb-4 px-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleEditClick(product)}
-                  >
-                    <IoPencilOutline className="h-4 w-4 mr-2" />
-                    Editar
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={(e) => handleDeleteProduct(e, product.id)}
-                  >
-                    <IoTrashOutline className="h-4 w-4 mr-2" />
-                    Eliminar
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          ))
-          )}
-        </motion.div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </motion.div>
+        )}
 
         <Dialog open={isDialogOpen} onOpenChange={(open) => !open && setIsDialogOpen(false)}>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -458,14 +649,14 @@ const Inventory = () => {
                 <Label htmlFor="category" className="text-right">
                   Categoría
                 </Label>
-                <Input
-                  id="category"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  placeholder="Ej. Cuidado, Limpieza"
-                />
+                <div className="col-span-3">
+                  <CategoryAutocomplete
+                    value={formData.category}
+                    onChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                    categories={categories.filter(cat => cat !== "all")}
+                    placeholder="Ej. Cuidado, Limpieza"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="barcode" className="text-right">
@@ -478,7 +669,7 @@ const Inventory = () => {
                       name="barcode"
                       value={formData.barcode}
                       onChange={handleInputChange}
-                      placeholder="EAN-13, UPC-A, etc."
+                      placeholder="Cualquier tipo de código (EAN, UPC, QR, personalizado...)"
                       className="flex-1 font-mono"
                       disabled={editingId !== null}
                     />
@@ -499,14 +690,14 @@ const Inventory = () => {
                         <>
                           <IoCheckmarkCircleOutline className="h-4 w-4 text-green-500" />
                           <span className="text-green-600 dark:text-green-400">
-                            Código válido: {formatBarcode(formData.barcode)}
+                            {formatBarcode(formData.barcode)} ({detectBarcodeType(formData.barcode)})
                           </span>
                         </>
                       ) : (
                         <>
                           <IoAlertCircleOutline className="h-4 w-4 text-destructive" />
                           <span className="text-destructive">
-                            Código inválido
+                            El código no puede estar vacío
                           </span>
                         </>
                       )}
@@ -522,6 +713,7 @@ const Inventory = () => {
                   id="price"
                   name="price"
                   type="number"
+                  min="0"
                   step="0.01"
                   value={formData.price}
                   onChange={handleInputChange}
@@ -537,6 +729,7 @@ const Inventory = () => {
                   id="stock"
                   name="stock"
                   type="number"
+                  min="0"
                   value={formData.stock}
                   onChange={handleInputChange}
                   className="col-span-3"
@@ -636,6 +829,17 @@ const Inventory = () => {
           onClose={() => setIsScannerOpen(false)}
           onScan={handleBarcodeScanned}
           title="Escanear Código de Barras"
+        />
+
+        <ConfirmDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleConfirmDelete}
+          title="Eliminar Producto"
+          description="¿Estás seguro de que quieres eliminar este producto? Esta acción no se puede deshacer y también eliminará todos los movimientos asociados."
+          confirmText="Eliminar"
+          cancelText="Cancelar"
+          variant="destructive"
         />
       </motion.div>
     </div>

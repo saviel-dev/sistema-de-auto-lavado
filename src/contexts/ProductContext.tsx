@@ -173,9 +173,15 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       toast.success('Producto eliminado exitosamente');
       addNotification('warning', 'Producto Eliminado', `${deletedProduct?.name || 'Producto'} ha sido eliminado del inventario`);
       await fetchProducts();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting product:', error);
-      toast.error('Error al eliminar producto');
+      
+      // Check if it's a foreign key constraint error
+      if (error?.code === '23503') {
+        toast.error('No se puede eliminar el producto porque tiene movimientos asociados. Por favor, ejecuta la migración de base de datos.');
+      } else {
+        toast.error('Error al eliminar producto');
+      }
       throw error;
     }
   };

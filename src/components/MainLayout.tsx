@@ -29,10 +29,13 @@ const MainLayout = () => {
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, x: 20 }}
+                initial={{ opacity: 0, x: location.pathname === '/dashboard' ? 0 : 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
+                exit={{ opacity: 0, x: location.pathname === '/dashboard' ? 0 : -20 }}
+                transition={{ 
+                  duration: location.pathname === '/dashboard' ? 0.8 : 0.3, 
+                  ease: location.pathname === '/dashboard' ? "easeOut" : "easeInOut" 
+                }}
                 className="w-full h-full"
               >
                 <Outlet />

@@ -34,6 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { CategoryAutocomplete } from "@/components/ui/CategoryAutocomplete";
 
 const Consumables = () => {
   const { consumables, loading, addConsumable, updateConsumable, deleteConsumable, refreshConsumables } = useConsumables();
@@ -49,7 +50,8 @@ const Consumables = () => {
     stock: "",
     unit: "unidades",
     minStock: "",
-    cost: ""
+    cost: "",
+    category: ""
   });
   
   const { toast } = useToast();
@@ -69,7 +71,8 @@ const Consumables = () => {
       stock: "",
       unit: "unidades",
       minStock: "",
-      cost: ""
+      cost: "",
+      category: ""
     });
     setEditingId(null);
   };
@@ -86,7 +89,8 @@ const Consumables = () => {
       stock: item.stock.toString(),
       unit: item.unit,
       minStock: item.minStock.toString(),
-      cost: item.cost.toString()
+      cost: item.cost.toString(),
+      category: item.category || ""
     });
     setEditingId(item.id);
     setIsDialogOpen(true);
@@ -112,7 +116,8 @@ const Consumables = () => {
         stock: parseInt(formData.stock) || 0,
         unit: formData.unit,
         minStock: parseInt(formData.minStock) || 0,
-        cost: parseFloat(formData.cost) || 0
+        cost: parseFloat(formData.cost) || 0,
+        category: formData.category
       };
 
       if (editingId !== null) {
@@ -134,6 +139,9 @@ const Consumables = () => {
       await deleteConsumable(id);
     }
   };
+
+  // Extract unique categories
+  const categories = ["all", ...Array.from(new Set(consumables.map(c => c.category).filter(Boolean)))];
 
   const filteredConsumables = consumables.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -228,6 +236,13 @@ const Consumables = () => {
                   <TableCell>
                     <div className="font-medium text-base">{item.name}</div>
                     <div className="text-xs text-muted-foreground line-clamp-1">{item.description}</div>
+                    {item.category && (
+                      <div className="mt-1">
+                        <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                          {item.category}
+                        </span>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="font-semibold">{item.stock}</div>
@@ -287,6 +302,16 @@ const Consumables = () => {
                <div className="space-y-2 col-span-2">
                   <Label htmlFor="description">Descripción</Label>
                   <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} placeholder="Detalles del producto..." />
+               </div>
+
+               <div className="space-y-2 col-span-2">
+                  <Label htmlFor="category">Categoría</Label>
+                  <CategoryAutocomplete
+                    value={formData.category}
+                    onChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                    categories={categories.filter(cat => cat !== "all")}
+                    placeholder="Ej. Limpieza, Mantenimiento"
+                  />
                </div>
 
                <div className="space-y-2">

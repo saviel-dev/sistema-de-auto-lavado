@@ -88,15 +88,15 @@ const Dashboard = () => {
       title: "Pedidos Pendientes",
       value: pendingOrders.toString(),
       icon: IoCalendarOutline,
-      bgColor: "bg-green-600",
-      iconColor: "text-green-100"
+      bgColor: "bg-purple-600",
+      iconColor: "text-purple-100"
     },
     {
       title: "Tasa BCV",
       value: dolarData ? `Bs. ${dolarData.promedio.toFixed(2)}` : "Bs. 0.00",
       icon: IoTrendingUpOutline,
-      bgColor: "bg-emerald-600",
-      iconColor: "text-emerald-100",
+      bgColor: "bg-teal-600",
+      iconColor: "text-teal-100",
       showBs: false,
       isRate: true,
       subtitle: dolarData ? formatDate(dolarData.fechaActualizacion) : ""
@@ -105,8 +105,8 @@ const Dashboard = () => {
       title: "Ingresos del Día",
       value: earningsToday.toFixed(2),
       icon: IoCashOutline,
-      bgColor: "bg-amber-600",
-      iconColor: "text-amber-100",
+      bgColor: "bg-emerald-600",
+      iconColor: "text-emerald-100",
       showBs: true
     },
   ];

@@ -11,6 +11,7 @@ export interface Consumable {
   unit: string;
   minStock: number;
   cost: number;
+  category?: string;
   // image_url removed
 }
 
@@ -46,7 +47,8 @@ export const ConsumablesProvider: React.FC<{ children: ReactNode }> = ({ childre
         stock: item.stock,
         unit: item.unidad,
         minStock: item.stock_minimo,
-        cost: item.costo
+        cost: item.costo,
+        category: item.categoria
       }));
 
       setConsumables(mappedData);
@@ -72,7 +74,8 @@ export const ConsumablesProvider: React.FC<{ children: ReactNode }> = ({ childre
           stock: consumable.stock,
           unidad: consumable.unit,
           stock_minimo: consumable.minStock,
-          costo: consumable.cost
+          costo: consumable.cost,
+          categoria: consumable.category
         }]);
 
       if (error) throw error;
@@ -95,6 +98,7 @@ export const ConsumablesProvider: React.FC<{ children: ReactNode }> = ({ childre
       if (updates.unit !== undefined) dbUpdates.unidad = updates.unit;
       if (updates.minStock !== undefined) dbUpdates.stock_minimo = updates.minStock;
       if (updates.cost !== undefined) dbUpdates.costo = updates.cost;
+      if (updates.category !== undefined) dbUpdates.categoria = updates.category;
 
       const { error } = await supabase
         .from('insumos')

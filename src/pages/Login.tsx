@@ -6,10 +6,12 @@ import { IoCarSportOutline, IoEyeOutline, IoEyeOffOutline } from "react-icons/io
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLoader } from "@/contexts/LoaderContext";
 
 const Login = () => {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
+  const { showLoader, hideLoader } = useLoader();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -56,7 +58,18 @@ const Login = () => {
       }
 
       toast.success("Bienvenido de nuevo");
-      navigate("/dashboard");
+      
+      // Activar loader global y esperar 2 segundos
+      showLoader();
+      setIsLoading(false); // Detener spinner local del botón
+      
+      setTimeout(() => {
+        navigate("/dashboard");
+        // El loader se ocultará automáticamente cuando el usuario llegue al dashboard o podemos ocultarlo explícitamente después de navegar
+        // Es mejor ocultarlo después de un pequeño delay para asegurar que la nueva página haya montado
+        setTimeout(() => hideLoader(), 500);
+      }, 2000);
+
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.message === "Invalid login credentials" ? "Credenciales inválidas" : "Error al iniciar sesión");

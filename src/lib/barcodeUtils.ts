@@ -4,27 +4,22 @@
  */
 
 /**
- * Validates if a barcode string is in a valid format (EAN-13, UPC-A, EAN-8, UPC-E)
+ * Validates if a barcode string is valid
+ * Now accepts ANY non-empty string to support all barcode formats:
+ * - Standard formats: EAN-13, UPC-A, EAN-8, UPC-E, Code 39, Code 128
+ * - 2D codes: QR codes, Data Matrix, PDF417
+ * - Custom/proprietary formats
+ * - Alphanumeric codes
  */
 export function validateBarcode(code: string): boolean {
   if (!code) return false;
 
-  // Remove any spaces or dashes
-  const cleanCode = code.replace(/[\s-]/g, "");
+  // Remove leading/trailing whitespace
+  const trimmedCode = code.trim();
 
-  // Check if it's all digits
-  if (!/^\d+$/.test(cleanCode)) return false;
-
-  // Valid lengths: EAN-13 (13), UPC-A (12), EAN-8 (8), UPC-E (6-8)
-  const validLengths = [6, 7, 8, 12, 13];
-  if (!validLengths.includes(cleanCode.length)) return false;
-
-  // Validate check digit for EAN-13 and UPC-A
-  if (cleanCode.length === 13 || cleanCode.length === 12) {
-    return validateCheckDigit(cleanCode);
-  }
-
-  return true;
+  // Accept any non-empty string (minimum 1 character)
+  // This allows for maximum flexibility with different barcode types
+  return trimmedCode.length > 0;
 }
 
 /**
@@ -70,26 +65,32 @@ export function calculateCheckDigit(code: string): string {
 
 /**
  * Formats a barcode for display (adds spaces for readability)
+ * Handles standard formats and returns custom formats as-is
  */
 export function formatBarcode(code: string): string {
   const cleanCode = code.replace(/[\s-]/g, "");
+  const isNumeric = /^\d+$/.test(cleanCode);
 
-  // Format EAN-13: XXX XXXX XXXX X
-  if (cleanCode.length === 13) {
-    return cleanCode.replace(/(\d{3})(\d{4})(\d{5})(\d{1})/, "$1 $2 $3 $4");
+  // Only format standard numeric barcodes
+  if (isNumeric) {
+    // Format EAN-13: XXX XXXX XXXX X
+    if (cleanCode.length === 13) {
+      return cleanCode.replace(/(\d{3})(\d{4})(\d{5})(\d{1})/, "$1 $2 $3 $4");
+    }
+
+    // Format UPC-A: X XXXXX XXXXX X
+    if (cleanCode.length === 12) {
+      return cleanCode.replace(/(\d{1})(\d{5})(\d{5})(\d{1})/, "$1 $2 $3 $4");
+    }
+
+    // Format EAN-8: XXXX XXXX
+    if (cleanCode.length === 8) {
+      return cleanCode.replace(/(\d{4})(\d{4})/, "$1 $2");
+    }
   }
 
-  // Format UPC-A: X XXXXX XXXXX X
-  if (cleanCode.length === 12) {
-    return cleanCode.replace(/(\d{1})(\d{5})(\d{5})(\d{1})/, "$1 $2 $3 $4");
-  }
-
-  // Format EAN-8: XXXX XXXX
-  if (cleanCode.length === 8) {
-    return cleanCode.replace(/(\d{4})(\d{4})/, "$1 $2");
-  }
-
-  return cleanCode;
+  // Return custom/alphanumeric codes as-is (trimmed)
+  return code.trim();
 }
 
 /**
@@ -121,21 +122,35 @@ export function normalizeBarcode(code: string): string {
 
 /**
  * Detects the barcode type based on length and format
+ * Now supports detection of multiple barcode types
  */
 export function detectBarcodeType(code: string): string {
   const cleanCode = code.replace(/[\s-]/g, "");
+  const isNumeric = /^\d+$/.test(cleanCode);
+  const isAlphanumeric = /^[A-Z0-9]+$/i.test(cleanCode);
 
-  switch (cleanCode.length) {
-    case 13:
-      return "EAN-13";
-    case 12:
-      return "UPC-A";
-    case 8:
-      return "EAN-8";
-    case 6:
-    case 7:
-      return "UPC-E";
-    default:
-      return "Unknown";
+  // Standard numeric barcodes
+  if (isNumeric) {
+    switch (cleanCode.length) {
+      case 13:
+        return "EAN-13";
+      case 12:
+        return "UPC-A";
+      case 8:
+        return "EAN-8";
+      case 6:
+      case 7:
+        return "UPC-E";
+      default:
+        return cleanCode.length > 13 ? "Código Numérico Largo" : "Código Numérico";
+    }
   }
+
+  // Alphanumeric codes (Code 39, Code 128, etc.)
+  if (isAlphanumeric) {
+    return "Código Alfanumérico";
+  }
+
+  // Special characters (QR, Data Matrix, etc.)
+  return "Código Personalizado";
 }
